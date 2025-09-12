@@ -1,0 +1,4 @@
+.DS_Store
+.vscode/settings.json
+samples/.env
+samples/__pycache__/prompts.cpython-313.pyc
