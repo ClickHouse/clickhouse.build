@@ -104,12 +104,16 @@ function generateExpenseBatch(batchSize) {
 }
 
 async function seedDatabase() {
-  const targetRows = 5000000000; // 5 billion rows
+  // Use a reasonable default (1,000,000 rows) and allow override via SEED_EXPENSE_ROWS env var
+  const DEFAULT_TARGET_ROWS = 1000000;
+  const targetRows = parseInt(process.env.SEED_EXPENSE_ROWS, 10) || DEFAULT_TARGET_ROWS;
   const batchSize = 1000; // Smaller batch size to avoid parameter limits
   const totalBatches = Math.ceil(targetRows / batchSize);
   
   console.log(`Starting database seeding: ${targetRows.toLocaleString()} rows in ${totalBatches.toLocaleString()} batches`);
-  console.log('This will take several hours...');
+  if (targetRows > 10000000) {
+    console.log('Warning: Seeding a very large number of rows may take a long time and consume significant disk space.');
+  }
   
   try {
     // Check current row count
