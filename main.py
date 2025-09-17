@@ -17,13 +17,8 @@ def main():
         # Create orchestrator
         orchestrator = WorkflowOrchestrator()
         
-        # Run workflow with interleaved thinking
-        print("Starting intelligent workflow ...")
-        result = orchestrator.run_workflow(repo_path)
-        
-        print("\nWorkflow Result:")
-        print("=" * 60)
-        print(result)
+        # Run in conversational mode
+        orchestrator.run_conversational(repo_path)
         
     except Exception as e:
         print(f"Exception in write_new_content: {type(e).__name__}: {e}")
