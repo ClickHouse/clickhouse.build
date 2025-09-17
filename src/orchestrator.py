@@ -14,7 +14,6 @@ class WorkflowOrchestrator:
         - code_writer: Replaces the postgres analytics queries implementation with the new ClickHouse analytics queries  
 
         The agents will run sequentially code_reader -> code_converter -> data_migrator -> code_writer. 
-        
         The coordinator can re-try and validate accordingly.
         The coordinator understands the output of each agent and provides the output if needed as input to the next agent.
         """
