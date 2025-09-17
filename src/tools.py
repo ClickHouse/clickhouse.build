@@ -25,7 +25,6 @@ def code_reader(repo_path: str) -> str:
     try:
         env = {
             "FASTMCP_LOG_LEVEL": "DEBUG",
-            "AWS_REGION": "us-west-2",
             "AWS_PROFILE": os.getenv("AWS_PROFILE", "default"),
             "AWS_REGION": os.getenv("AWS_REGION", "us-east-1"),
         }
