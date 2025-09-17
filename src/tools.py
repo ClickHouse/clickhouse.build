@@ -6,7 +6,7 @@ from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from mcp import stdio_client, StdioServerParameters
 from strands_tools import shell, file_write, editor
-from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT
+from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT
 
 @tool
 def code_reader(repo_path: str) -> str:
@@ -24,8 +24,7 @@ def code_reader(repo_path: str) -> str:
     try:
         env = {
             "FASTMCP_LOG_LEVEL": "DEBUG",
-            "AWS_PROFILE": "eldimi-Admin",
-            "AWS_REGION": "us-east-1",
+            "AWS_REGION": "us-west-2",
         }
 
         git_repo_mcp_server = MCPClient(
@@ -58,22 +57,47 @@ def code_reader(repo_path: str) -> str:
 @tool
 def code_converter(data: str) -> str:
     """
-    Converts PostgreSQL analytics queries to ClickHouse analytics queries.
+    Converts PostgreSQL analytics queries to ClickHouse analytics queries using specialized knowledge.
 
     Args:
-        data: the file paths, code and code description
+        data: The PostgreSQL queries data including file paths, code content, and descriptions
 
     Returns:
-        The converted queries
+        JSON-formatted converted queries with detailed conversion notes and warnings
     """
-    code_converter_agent = Agent(
-        system_prompt="""You are a ClickHouse developer.
-        I will give some existing postgres queries and
-        you need to convert them to ClickHouse queries""",
-    )
+    bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
 
-    result = code_converter_agent(data)
-    return str(result)
+    try:
+        # Validate input
+        if not data or not data.strip():
+            return json.dumps({"error": "No query data provided for conversion"})
+
+        code_converter_agent = Agent(
+            model=bedrock_model,
+            system_prompt=CODE_CONVERTER_PROMPT,
+        )
+
+        result = code_converter_agent(data)
+
+        # Ensure we return valid JSON
+        try:
+            # Try to parse the result as JSON to validate it
+            json.loads(str(result))
+            return str(result)
+        except json.JSONDecodeError:
+            # If the result is not valid JSON, wrap it in a structured format
+            return json.dumps({
+                "conversion_result": str(result),
+                "note": "Raw conversion output - may need manual JSON parsing"
+            })
+
+    except Exception as e:
+        error_response = {
+            "error": f"Error during query conversion: {str(e)}",
+            "error_type": type(e).__name__,
+            "input_data_length": len(data) if data else 0
+        }
+        return json.dumps(error_response)
 
 @tool
 def code_writer(repo_path: str, converted_code: str) -> str:

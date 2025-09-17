@@ -8,4 +8,5 @@ dependencies = [
     "strands-agents>=1.8.0",
     "strands-agents-tools>=0.2.7",
     "mcp",
+    "notebook",
 ]
