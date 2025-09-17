@@ -4,15 +4,15 @@ import os
 from src.orchestrator import WorkflowOrchestrator
 
 def main():
-    
+
     # Repository path to analyze
     repo_path = ""
-    
+
     print("ClickHouse Build: PostgreSQL to ClickHouse Migration Tool")
     print("=" * 60)
     print(f"Repository: {repo_path}")
     print()
-    
+
     try:
         # Create orchestrator
         orchestrator = WorkflowOrchestrator()

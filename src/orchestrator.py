@@ -19,10 +19,10 @@ class WorkflowOrchestrator:
         """
         # Enable console mode for interactive tools
         os.environ["STRANDS_TOOL_CONSOLE_MODE"] = "enabled"
-    
+
     def run_workflow(self, repo_path: str) -> str:
         """Execute an intelligent workflow for the given task."""
-        
+
         claude4_model = BedrockModel(
             model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
             max_tokens=4096,
@@ -35,13 +35,13 @@ class WorkflowOrchestrator:
                 }
             }
         )
-        
+
         orchestrator = Agent(
             model=claude4_model,
             system_prompt=self.system_prompt,
             tools=[code_reader, code_converter, code_writer, data_migrator]
         )
-        
+
         prompt = f"""Coordinate the code migration for the following local repository: {repo_path}
 
         Instructions:
@@ -51,11 +51,11 @@ class WorkflowOrchestrator:
         4. Coordinate multiple agents as needed for comprehensive results
         5. Ensure accuracy by fact-checking when appropriate
         6. Provide a comprehensive final response that addresses all aspects
-        
+
         Remember: Your thinking between tool calls helps you make better decisions.
         Use it to plan, evaluate results, and adjust your strategy.
         """
-        
+
         try:
             result = orchestrator(prompt)
             return str(result)
