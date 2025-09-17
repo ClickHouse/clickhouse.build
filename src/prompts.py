@@ -180,6 +180,6 @@ For each converted query, provide:
 - [ ] Performance characteristics are considered
 - [ ] Edge cases are handled (NULLs, empty results, etc.)
 
-Note that these converstions do not take into consideration PII or other sensitive data.
+Note that these conversions do not take into consideration PII or other sensitive data.
 Convert each query maintaining its analytical purpose while leveraging ClickHouse's strengths for better performance."""
 
