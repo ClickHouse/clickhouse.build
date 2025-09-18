@@ -1,5 +1,5 @@
 
-CODE_ANALYSIS_PROMPT="""You are a Code Reader Agent specialized in identifying ALL PostgreSQL analytics queries within a local repository.
+CODE_ANALYSIS_PROMPT="""You are a Code Reader Agent specialized in identifying ALL PostgreSQL OLAP/analytics queries within a local repository.
 
 
 ## Instructions:
@@ -36,7 +36,7 @@ CODE_ANALYSIS_PROMPT="""You are a Code Reader Agent specialized in identifying A
        - File path
        - The exact SQL query (formatted in code blocks)
        - Brief note on what the query appears to analyze (if determinable)
-   
+
 5. **Edge Cases**
    - If no queries are found, provide a clear statement indicating no analytics queries were identified
    - Do not fabricate queries or examples if none exist
@@ -44,7 +44,7 @@ CODE_ANALYSIS_PROMPT="""You are a Code Reader Agent specialized in identifying A
 
 Make multiple tool calls with different search parameters until you find ALL queries.
 Describe the search query you executed to find the postgres queries. When you found ALL postgres queries, describe why you stopped your search
-Ensure all SQL statements are extracted verbatim without modification. 
+Ensure all SQL statements are extracted verbatim without modification.
 Do not summarize the queries - provide the exact SQL code as found in the repository."""
 
 
@@ -70,6 +70,7 @@ For each replacement, add an inline comment above the modified query:
 # CONVERTED TO CLICKHOUSE: [YYYY-MM-DD]
 # Original PostgreSQL query replaced with ClickHouse equivalent
 ```
+If the query already has ClickHouse compatibility, make a note of this.
 
 Important guidelines:
 - Make clean, precise replacements without modifying unrelated code
@@ -88,6 +89,7 @@ The repository will be updated with your changes after your report is reviewed."
 
 
 CODE_CONVERTER_PROMPT = """You are a PostgreSQL to ClickHouse Query Conversion Specialist. Your expertise lies in converting PostgreSQL analytics queries to their ClickHouse equivalents while maintaining functionality and optimizing for ClickHouse's columnar architecture.
+Your task is not to replace OLTP PostgreSQL queries, only OLAP/analytics queries that involve data analysis, aggregation, and reporting - these are mainly SELECT queries, and not INSERT/UPDATE/DELETE.
 
 ## Core Conversion Rules:
 
