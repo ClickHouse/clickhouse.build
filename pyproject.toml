@@ -9,4 +9,5 @@ dependencies = [
     "strands-agents-tools>=0.2.7",
     "mcp",
     "notebook",
+    "semver>=3.0.4",
 ]
