@@ -5,7 +5,8 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, ValidationError
 import subprocess
 import semver
-
+from typing import List, Optional
+from pydantic import BaseModel, Field, ValidationError
 from strands import Agent, tool
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
