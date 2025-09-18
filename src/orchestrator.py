@@ -1,20 +1,8 @@
 import os
 from strands import Agent
 from strands.models import BedrockModel
-from strands.handlers.callback_handler import PrintingCallbackHandler
 from .tools import code_reader, code_converter, code_writer, data_migrator, data_migrator
-
-def get_callback_handler():
-    """
-    Returns the appropriate callback handler based on environment.
-    In dev: returns default strands callback handler
-    In prod: returns None
-    """
-    env = os.getenv("ENVIRONMENT", "dev").lower()
-    if env == "prod":
-        return None
-    else:
-        return PrintingCallbackHandler()
+from .utils import get_callback_handler
 
 class WorkflowOrchestrator:
     def __init__(self):
@@ -107,7 +95,7 @@ class WorkflowOrchestrator:
         if initial_repo_path:
             message = f"Please coordinate the code migration for repository: {initial_repo_path}"
         else:
-            message = "Please help me migrate PostgreSQL queries to ClickHouse. What repository should I analyze?"
+            message = "Please help me migrate PostgreSQL queries to ClickHouse."
         
         print("ClickHouse Migration Assistant")
         print("=" * 40)

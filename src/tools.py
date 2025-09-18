@@ -8,32 +8,7 @@ from strands.tools.mcp import MCPClient
 from mcp import stdio_client, StdioServerParameters
 from strands_tools import shell, file_write, editor
 from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT
-from strands.handlers.callback_handler import PrintingCallbackHandler
-
-
-def get_callback_handler():
-    """
-    Returns the appropriate callback handler based on environment.
-    In dev: returns default strands callback handler
-    In prod: returns None
-    """
-    env = os.getenv("ENVIRONMENT", "dev").lower()
-    if env == "prod":
-        return None
-    else:
-        return PrintingCallbackHandler()
-
-def get_mcp_log_level():
-    """
-    Returns the appropriate MCP log level based on environment.
-    In dev: returns DEBUG for detailed logging
-    In prod: returns ERROR for minimal logging
-    """
-    env = os.getenv("ENVIRONMENT", "dev").lower()
-    if env == "prod":
-        return "ERROR"
-    else:
-        return "DEBUG"
+from .utils import get_callback_handler, get_mcp_log_level
 
 @tool
 def code_reader(repo_path: str) -> str:
@@ -96,13 +71,6 @@ def code_converter(data: str) -> str:
     """
     bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
 
-    code_converter_agent = Agent(
-        system_prompt="""You are a ClickHouse developer.
-        I will give some existing postgres queries and
-        you need to convert them to ClickHouse queries""",
-        callback_handler=get_callback_handler()
-    )
-
     try:
         # Validate input
         if not data or not data.strip():
@@ -111,6 +79,7 @@ def code_converter(data: str) -> str:
         code_converter_agent = Agent(
             model=bedrock_model,
             system_prompt=CODE_CONVERTER_PROMPT,
+            callback_handler=get_callback_handler()
         )
 
         result = code_converter_agent(data)
