@@ -145,25 +145,19 @@ CODE_CONVERTER_PROMPT = """You are a PostgreSQL to ClickHouse Query Conversion S
 
 ## Output Format Requirements:
 
-For each converted query, provide:
+You will provide structured output containing:
 
-```json
-{
-  "original_file_path": "path/to/file.sql",
-  "line_context": "Brief description of where the query appears",
-  "original_query": "-- Original PostgreSQL query here",
-  "converted_query": "-- Converted ClickHouse query here",
-  "conversion_notes": [
-    "Explanation of key changes made",
-    "Performance considerations",
-    "Any manual adjustments needed"
-  ],
-  "compatibility_warnings": [
-    "Any functionality that might behave differently",
-    "Required schema or data migration notes"
-  ]
-}
-```
+1. **converted_queries**: An array of converted query objects, each containing:
+   - **original_file_path**: Path to the file containing the original query
+   - **line_context**: Brief description of where the query appears
+   - **original_query**: The exact original PostgreSQL query
+   - **converted_query**: The converted ClickHouse query
+   - **conversion_notes**: Array of key changes made, performance considerations and any manual adjustments needed
+   - **compatibility_warnings**: Array of functionality that might behave differently
+
+2. **summary**: Brief summary of the conversion process
+3. **total_queries_converted**: Total number of queries converted
+4. **overall_notes**: General notes about the conversion process
 
 ## Best Practices:
 1. Preserve query logic and business intent exactly

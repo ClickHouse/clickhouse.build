@@ -1,6 +1,8 @@
 from enum import Enum
 import json
 import os
+from typing import List, Optional
+from pydantic import BaseModel, Field, ValidationError
 
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -9,6 +11,24 @@ from mcp import stdio_client, StdioServerParameters
 from strands_tools import shell, file_write, editor
 from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT
 from .utils import get_callback_handler, get_mcp_log_level
+
+
+class ConvertedQuery(BaseModel):
+    """Structured output model for a single converted query."""
+    original_file_path: str = Field(description="Path to the file containing the original query")
+    line_context: str = Field(description="Brief description of where the query appears in the file")
+    original_query: str = Field(description="The original PostgreSQL query")
+    converted_query: str = Field(description="The converted ClickHouse query")
+    conversion_notes: List[str] = Field(description="List of key changes made and performance considerations")
+    compatibility_warnings: List[str] = Field(description="Any functionality that might behave differently or require manual verification")
+
+
+class QueryConversionResult(BaseModel):
+    """Structured output model for the complete conversion result."""
+    converted_queries: List[ConvertedQuery] = Field(description="List of all converted queries")
+    summary: str = Field(description="Brief summary of the conversion process")
+    total_queries_converted: int = Field(description="Total number of queries that were converted")
+    overall_notes: List[str] = Field(description="General notes about the conversion process", default_factory=list)
 
 @tool
 def code_reader(repo_path: str) -> str:
@@ -74,7 +94,13 @@ def code_converter(data: str) -> str:
     try:
         # Validate input
         if not data or not data.strip():
-            return json.dumps({"error": "No query data provided for conversion"})
+            error_result = QueryConversionResult(
+                converted_queries=[],
+                summary="No query data provided for conversion",
+                total_queries_converted=0,
+                overall_notes=["Error: No input data provided"]
+            )
+            return error_result.model_dump_json(indent=2)
 
         code_converter_agent = Agent(
             model=bedrock_model,
@@ -82,27 +108,49 @@ def code_converter(data: str) -> str:
             callback_handler=get_callback_handler()
         )
 
-        result = code_converter_agent(data)
+        # Use structured_output method to get structured response
+        result = code_converter_agent.structured_output(QueryConversionResult, data)
+        
+        return result.model_dump_json(indent=2)
 
-        # Ensure we return valid JSON
+    except ValidationError as e:
+        print(f"Validation Error: {e}")
+        
+        # Try to get the raw response from the agent for fallback processing
         try:
-            # Try to parse the result as JSON to validate it
-            json.loads(str(result))
-            return str(result)
-        except json.JSONDecodeError:
-            # If the result is not valid JSON, wrap it in a structured format
-            return json.dumps({
-                "conversion_result": str(result),
-                "note": "Raw conversion output - may need manual JSON parsing"
-            })
-
+            # Make a regular call to get the raw response
+            raw_result = code_converter_agent(data)
+            raw_data = str(raw_result)
+        except Exception:
+            raw_data = "Could not retrieve raw response"
+        
+        # Create a structured error response that includes the raw data for workflow continuation
+        validation_error_result = QueryConversionResult(
+            converted_queries=[],
+            summary="Validation error: The model output did not match the expected schema, but raw data is included",
+            total_queries_converted=0,
+            overall_notes=[
+                "The language model's response could not be validated against the expected schema",
+                f"Validation errors: {str(e)}",
+                "Raw response data is included below for manual processing or workflow continuation",
+                f"Raw response: {raw_data}",
+                "This might indicate the model needs clearer instructions or the schema needs adjustment"
+            ]
+        )
+        return validation_error_result.model_dump_json(indent=2)
+        
     except Exception as e:
-        error_response = {
-            "error": f"Error during query conversion: {str(e)}",
-            "error_type": type(e).__name__,
-            "input_data_length": len(data) if data else 0
-        }
-        return json.dumps(error_response)
+        print(f"Error: {e}")
+        error_result = QueryConversionResult(
+            converted_queries=[],
+            summary=f"Error during query conversion: {str(e)}",
+            total_queries_converted=0,
+            overall_notes=[
+                f"Error type: {type(e).__name__}",
+                f"Input data length: {len(data) if data else 0}"
+            ]
+        )
+        return error_result.model_dump_json(indent=2)
 
 @tool
 def code_writer(repo_path: str, converted_code: str) -> str:
