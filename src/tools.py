@@ -3,6 +3,8 @@ import json
 import os
 from typing import List, Optional
 from pydantic import BaseModel, Field, ValidationError
+import subprocess
+import semver
 
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -239,3 +241,136 @@ def data_migrator(
 
     except Exception as e:
         return f"Error creating ClickPipe configuration: {str(e)}"
+
+@tool
+def ensure_clickhouse_client(repo_path: str) -> str:
+    """
+    Ensures that @clickhouse/client package is installed or upgraded to the latest minor version
+    in the given repository. Checks for package.json, searches npm for the package, and either
+    installs it or upgrades to the latest compatible version.
+
+    Args:
+        repo_path: The path to the repository to check and update
+
+    Returns:
+        JSON string containing the operation result, current version, and any actions taken
+    """
+    try:
+        result = {
+            "success": False,
+            "action": None,
+            "current_version": None,
+            "latest_version": None,
+            "message": ""
+        }
+
+        # Check if package.json exists
+        package_json_path = os.path.join(repo_path, "package.json")
+        if not os.path.exists(package_json_path):
+            result["message"] = "No package.json found in repository"
+            return json.dumps(result)
+
+        # Read package.json
+        with open(package_json_path, 'r') as f:
+            package_data = json.load(f)
+
+        # Check if @clickhouse/client is already installed
+        dependencies = package_data.get("dependencies", {})
+        dev_dependencies = package_data.get("devDependencies", {})
+        current_version = dependencies.get("@clickhouse/client") or dev_dependencies.get("@clickhouse/client")
+
+        # Get latest version from npm
+        try:
+            npm_info = subprocess.run(
+                ["npm", "view", "@clickhouse/client", "version", "--json"],
+                capture_output=True,
+                text=True,
+                cwd=repo_path,
+                timeout=30
+            )
+
+            if npm_info.returncode != 0:
+                result["message"] = f"Failed to fetch package info from npm: {npm_info.stderr}"
+                return json.dumps(result)
+
+            latest_version = json.loads(npm_info.stdout.strip())
+            result["latest_version"] = latest_version
+
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
+            result["message"] = f"Error fetching package version: {str(e)}"
+            return json.dumps(result)
+
+        if current_version is None:
+            # Package not installed, install it
+            try:
+                install_cmd = subprocess.run(
+                    ["npm", "install", f"@clickhouse/client@^{latest_version}"],
+                    capture_output=True,
+                    text=True,
+                    cwd=repo_path,
+                    timeout=120
+                )
+
+                if install_cmd.returncode == 0:
+                    result["success"] = True
+                    result["action"] = "installed"
+                    result["current_version"] = f"^{latest_version}"
+                    result["message"] = f"Successfully installed @clickhouse/client@^{latest_version}"
+                else:
+                    result["message"] = f"Failed to install package: {install_cmd.stderr}"
+
+            except subprocess.TimeoutExpired:
+                result["message"] = "npm install timed out"
+            except Exception as e:
+                result["message"] = f"Error during installation: {str(e)}"
+
+        else:
+            # Package is installed, check if update is needed
+            result["current_version"] = current_version
+
+            # Parse current version (remove ^ or ~ if present)
+            current_clean = current_version.lstrip("^~")
+
+            try:
+                if semver.compare(latest_version, current_clean) > 0:
+                    # Update available
+                    try:
+                        update_cmd = subprocess.run(
+                            ["npm", "install", f"@clickhouse/client@^{latest_version}"],
+                            capture_output=True,
+                            text=True,
+                            cwd=repo_path,
+                            timeout=120
+                        )
+
+                        if update_cmd.returncode == 0:
+                            result["success"] = True
+                            result["action"] = "upgraded"
+                            result["message"] = f"Successfully upgraded @clickhouse/client from {current_version} to ^{latest_version}"
+                        else:
+                            result["message"] = f"Failed to upgrade package: {update_cmd.stderr}"
+
+                    except subprocess.TimeoutExpired:
+                        result["message"] = "npm install timed out during upgrade"
+                    except Exception as e:
+                        result["message"] = f"Error during upgrade: {str(e)}"
+                else:
+                    # Already up to date
+                    result["success"] = True
+                    result["action"] = "no_action_needed"
+                    result["message"] = f"@clickhouse/client is already up to date at version {current_version}"
+
+            except Exception as e:
+                result["message"] = f"Error comparing versions: {str(e)}"
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        error_result = {
+            "success": False,
+            "action": None,
+            "current_version": None,
+            "latest_version": None,
+            "message": f"Unexpected error: {str(e)}"
+        }
+        return json.dumps(error_result)

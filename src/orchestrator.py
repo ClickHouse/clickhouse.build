@@ -1,7 +1,7 @@
 import os
 from strands import Agent
 from strands.models import BedrockModel
-from .tools import code_reader, code_converter, code_writer, data_migrator, data_migrator
+from .tools import code_reader, code_converter, code_writer, data_migrator, ensure_clickhouse_client
 from .utils import get_callback_handler
 
 class WorkflowOrchestrator:
@@ -9,12 +9,13 @@ class WorkflowOrchestrator:
         self.system_prompt = """You are an intelligent workflow orchestrator with access to specialist agents.
 
         Your role is to intelligently coordinate a workflow using these specialist agents:
+        - ensure_clickhouse_client: Ensures @clickhouse/client npm package is installed or upgraded to the latest version
         - code_reader: Reads a repository content from the file system and searches for all postgres analytics queries
         - code_converter: Converts the found postgres analytics queries to ClickHouse analytics queries
         - data_migrator: Generates ClickPipe configuration for migrating data from Postgres to ClickHouse. Does not do migration. It just generates the config json file.
-        - code_writer: Replaces the postgres analytics queries implementation with the new ClickHouse analytics queries  
+        - code_writer: Replaces the postgres analytics queries implementation with the new ClickHouse analytics queries
 
-        The agents will run sequentially code_reader -> code_converter -> data_migrator -> code_writer. 
+        The agents should run sequentially: ensure_clickhouse_client -> code_reader -> code_converter -> data_migrator -> code_writer.
         The coordinator can re-try and validate accordingly.
         The coordinator understands the output of each agent and provides the output if needed as input to the next agent.
         """
@@ -40,7 +41,7 @@ class WorkflowOrchestrator:
         orchestrator = Agent(
             model=claude4_model,
             system_prompt=self.system_prompt,
-            tools=[code_reader, code_converter, code_writer, data_migrator],
+            tools=[ensure_clickhouse_client, code_reader, code_converter, code_writer, data_migrator],
             callback_handler=get_callback_handler()
         )
 
@@ -87,7 +88,7 @@ class WorkflowOrchestrator:
             IMPORTANT: If you need information from the user (like repository path, clarifications, etc.), 
             ask them directly and wait for their response. Do not proceed without required information.
             """,
-            tools=[code_reader, code_converter, data_migrator, code_writer],
+            tools=[ensure_clickhouse_client, code_reader, code_converter, data_migrator, code_writer],
             callback_handler=get_callback_handler()
         )
         
