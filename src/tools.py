@@ -7,12 +7,9 @@ from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from mcp import stdio_client, StdioServerParameters
 from strands_tools import shell, file_write, editor
-<<<<<<< HEAD
 from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT
-=======
 from strands.handlers.callback_handler import PrintingCallbackHandler
-from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT
->>>>>>> 56c5876 (Make console output less verbose in prod)
+
 
 def get_callback_handler():
     """
