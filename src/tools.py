@@ -281,7 +281,10 @@ def ensure_clickhouse_client(repo_path: str) -> str:
             result["current_version"] = current_version
 
             # Parse current version (remove ^ or ~ if present)
-            current_clean = current_version.lstrip("^~")
+            if current_version.startswith("^") or current_version.startswith("~"):
+                current_clean = current_version[1:]
+            else:
+                current_clean = current_version
 
             try:
                 if semver.compare(latest_version, current_clean) > 0:
