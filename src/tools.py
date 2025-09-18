@@ -7,7 +7,36 @@ from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from mcp import stdio_client, StdioServerParameters
 from strands_tools import shell, file_write, editor
+<<<<<<< HEAD
 from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT
+=======
+from strands.handlers.callback_handler import PrintingCallbackHandler
+from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT
+>>>>>>> 56c5876 (Make console output less verbose in prod)
+
+def get_callback_handler():
+    """
+    Returns the appropriate callback handler based on environment.
+    In dev: returns default strands callback handler
+    In prod: returns None
+    """
+    env = os.getenv("ENVIRONMENT", "dev").lower()
+    if env == "prod":
+        return None
+    else:
+        return PrintingCallbackHandler()
+
+def get_mcp_log_level():
+    """
+    Returns the appropriate MCP log level based on environment.
+    In dev: returns DEBUG for detailed logging
+    In prod: returns ERROR for minimal logging
+    """
+    env = os.getenv("ENVIRONMENT", "dev").lower()
+    if env == "prod":
+        return "ERROR"
+    else:
+        return "DEBUG"
 
 @tool
 def code_reader(repo_path: str) -> str:
@@ -24,7 +53,7 @@ def code_reader(repo_path: str) -> str:
 
     try:
         env = {
-            "FASTMCP_LOG_LEVEL": "DEBUG",
+            "FASTMCP_LOG_LEVEL": get_mcp_log_level(),
             "AWS_PROFILE": os.getenv("AWS_PROFILE", "default"),
             "AWS_REGION": os.getenv("AWS_REGION", "us-east-1"),
         }
@@ -45,7 +74,7 @@ def code_reader(repo_path: str) -> str:
                 model=bedrock_model,
                 system_prompt=CODE_ANALYSIS_PROMPT,
                 tools=tools,
-                callback_handler=None
+                callback_handler=get_callback_handler()
             )
 
             result = str(code_reader_agent(repo_path))
@@ -69,6 +98,13 @@ def code_converter(data: str) -> str:
         JSON-formatted converted queries with detailed conversion notes and warnings
     """
     bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
+
+    code_converter_agent = Agent(
+        system_prompt="""You are a ClickHouse developer.
+        I will give some existing postgres queries and
+        you need to convert them to ClickHouse queries""",
+        callback_handler=get_callback_handler()
+    )
 
     try:
         # Validate input
@@ -118,7 +154,7 @@ def code_writer(repo_path: str, converted_code: str) -> str:
         code_writer_agent = Agent(
             system_prompt=CODE_WRITER_PROMPT,
             tools=[shell, file_write, editor],
-            callback_handler=None
+            callback_handler=get_callback_handler()
         )
 
         result = code_writer_agent(

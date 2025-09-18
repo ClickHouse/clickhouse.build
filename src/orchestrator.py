@@ -1,7 +1,20 @@
 import os
 from strands import Agent
 from strands.models import BedrockModel
+from strands.handlers.callback_handler import PrintingCallbackHandler
 from .tools import code_reader, code_converter, code_writer, data_migrator, data_migrator
+
+def get_callback_handler():
+    """
+    Returns the appropriate callback handler based on environment.
+    In dev: returns default strands callback handler
+    In prod: returns None
+    """
+    env = os.getenv("ENVIRONMENT", "dev").lower()
+    if env == "prod":
+        return None
+    else:
+        return PrintingCallbackHandler()
 
 class WorkflowOrchestrator:
     def __init__(self):
@@ -39,7 +52,8 @@ class WorkflowOrchestrator:
         orchestrator = Agent(
             model=claude4_model,
             system_prompt=self.system_prompt,
-            tools=[code_reader, code_converter, code_writer, data_migrator]
+            tools=[code_reader, code_converter, code_writer, data_migrator],
+            callback_handler=get_callback_handler()
         )
 
         prompt = f"""Coordinate the code migration for the following local repository: {repo_path}
@@ -85,7 +99,8 @@ class WorkflowOrchestrator:
             IMPORTANT: If you need information from the user (like repository path, clarifications, etc.), 
             ask them directly and wait for their response. Do not proceed without required information.
             """,
-            tools=[code_reader, code_converter, data_migrator, code_writer]
+            tools=[code_reader, code_converter, data_migrator, code_writer],
+            callback_handler=get_callback_handler()
         )
         
         # Start conversation
