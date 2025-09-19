@@ -6,7 +6,7 @@ from src.orchestrator import WorkflowOrchestrator
 def main():
 
     # Repository path to analyze
-    repo_path = ""
+    repo_path = "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-direct"
 
     print("ClickHouse Build: PostgreSQL to ClickHouse Migration Tool")
     print("=" * 60)
@@ -16,10 +16,10 @@ def main():
     try:
         # Create orchestrator
         orchestrator = WorkflowOrchestrator()
-        
+
         # Run in conversational mode
         orchestrator.run_conversational(repo_path)
-        
+
     except Exception as e:
         print(f"Exception in write_new_content: {type(e).__name__}: {e}")
         import traceback

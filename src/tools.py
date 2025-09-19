@@ -189,7 +189,12 @@ def data_migrator(
             }
         }
 
-        return json.dumps(config, indent=2)
+        return """You can create ClickHouse Cloud credentials by following this guide: https://clickhouse.com/docs/cloud/manage/openapi
+
+curl -X POST https://api.clickhouse.cloud/v1/organizations/${ORG_ID}/services/${SERVICE_ID}/clickpipes/ \\
+  --header 'Authorization: Basic (...)' \\
+  --header 'Content-Type: application/json' \\
+  --data '""" + json.dumps(config, indent=2) + "'"
 
     except Exception as e:
         return f"Error creating ClickPipe configuration: {str(e)}"
