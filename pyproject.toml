@@ -1,7 +1,7 @@
 [project]
 name = "clickhouse-build"
 version = "0.1.0"
-description = "Add your description here"
+description = "PostgreSQL to ClickHouse Migration Tool with AI-powered query conversion"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -10,4 +10,9 @@ dependencies = [
     "mcp",
     "notebook",
     "semver>=3.0.4",
+    "boto3",
+    "bedrock-agentcore"
 ]
+
+[project.scripts]
+clickhouse-build = "main:main"

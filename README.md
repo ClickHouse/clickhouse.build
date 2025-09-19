@@ -33,18 +33,46 @@ Uses **agents as tools** pattern with Claude 4's interleaved thinking:
 uv sync
 ```
 
-3. Edit repository path in `main.py`:
-```python
-repo_path = "/path/to/your/repository"  # Change this line
-```
-
-4. Ensure AWS credentials profile is enabled in your environment for accessing required services.
+3. Ensure AWS credentials profile is enabled in your environment for accessing required services.
 
 ## Usage
 
-Run the migration workflow:
+### Interactive Mode (Default)
+Run the migration workflow interactively:
 ```bash
+# Analyze current directory (default)
 uv run main.py
+
+# Analyze specific repository
+uv run main.py --path /path/to/your/repository
+```
+
+### Automated Mode
+Run the full workflow automatically:
+```bash
+# Current directory in auto mode
+uv run main.py --mode auto
+
+# Specific repository in auto mode
+uv run main.py --path /path/to/your/repository --mode auto
+```
+
+### Examples
+```bash
+# Analyze current directory (most common)
+uv run main.py
+
+# Analyze a specific project
+uv run main.py --path ./my-postgres-project
+
+# Analyze with absolute path
+uv run main.py --path /Users/username/projects/my-app
+
+# Run current directory in automated mode
+uv run main.py --mode auto
+
+# Run specific project in automated mode
+uv run main.py --path ./my-project --mode auto
 ```
 
 The tool will:
@@ -52,7 +80,14 @@ The tool will:
 2. **Convert** - Transform them to ClickHouse equivalents  
 3. **Write** - Replace the original queries with converted ones
 
+## CLI Options
+
+- `--path`: Path to the repository to analyze (default: current directory)
+- `--mode`: Execution mode
+  - `conversational` (default): Interactive mode with back-and-forth
+  - `auto`: Automated workflow execution
+
 ## Configuration
 
-- Repository path: Edit `repo_path` variable in `main.py`
 - Model settings: Modify models in `src/tools.py` and `src/orchestrator.py`
+- Environment variables: Set AWS profile and region as needed
