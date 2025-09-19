@@ -149,6 +149,26 @@ Your task is not to replace OLTP PostgreSQL queries, only OLAP/analytics queries
 - **GENERATE_SERIES**: Use `range()` or `arrayJoin(range())`
 - **String aggregation**: Use `groupArray()` + `arrayStringConcat()`
 
+### 8. The response type
+The Postgres and ClickHouse response types are different. This should be taken into consideration when consuming results from ClickHouse.
+This query will produce the following JSON structure from ClickHouse. This should be taken into consideration when consuming results from clickhouse
+
+The query
+SELECT COUNT() as count, coalesce(SUM(amount), 0) as total FROM expenses
+
+The ClickHouse response
+```json
+{
+  meta: [
+    { name: 'count', type: 'UInt64' },
+    { name: 'total', type: 'Decimal(38, 2)' }
+  ],
+  data: [ { count: '923000', total: 336493740.28 } ],
+  rows: 1,
+  statistics: { elapsed: 0.008276902, rows_read: 923000, bytes_read: 7384000 }
+}
+```
+
 ## Output Format Requirements:
 
 For each converted query, provide:
