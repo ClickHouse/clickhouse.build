@@ -89,5 +89,18 @@ The tool will:
 
 ## Configuration
 
-- Model settings: Modify models in `src/tools.py` and `src/orchestrator.py`
+### URLs and Settings
+Copy the template and customize URLs without rebuilding:
+```bash
+cp config.template.yaml config.yaml
+# Edit config.yaml to customize URLs, timeouts, etc.
+```
+
+The `config.yaml` file contains:
+- **ClickHouse URLs** - NPM package, GitHub releases, documentation sections
+- **Research sources** - Official docs, GitHub repos, Stack Overflow, blog
+- **Settings** - HTTP timeouts, user agent, retry logic
+
+### Model Settings
+- Modify models in `src/tools.py` and `src/orchestrator.py`
 - Environment variables: Set AWS profile and region as needed

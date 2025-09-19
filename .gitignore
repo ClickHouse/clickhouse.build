@@ -5,3 +5,4 @@ samples/__pycache__/prompts.cpython-313.pyc
 src/__pycache__/
 .ipynb_checkpoints/
 .next
+config.yaml

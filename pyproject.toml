@@ -10,8 +10,7 @@ dependencies = [
     "mcp",
     "notebook",
     "semver>=3.0.4",
-    "boto3",
-    "bedrock-agentcore"
+    "pyyaml"
 ]
 
 [project.scripts]
