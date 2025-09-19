@@ -1,0 +1,11 @@
+{
+  "pages": {
+    "/api/expenses/route": [
+      "static/chunks/c85a7d07e7b82c9a.js",
+      "static/chunks/5564f493499345f1.js",
+      "static/chunks/d04efc723d1783d5.js",
+      "static/chunks/8082ab48faca5ea1.js",
+      "static/chunks/turbopack-9016d2ea91ea052b.js"
+    ]
+  }
+}
