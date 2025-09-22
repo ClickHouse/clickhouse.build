@@ -15,6 +15,9 @@ class WorkflowOrchestrator:
         - code_writer: Replaces the postgres analytics queries implementation with the new ClickHouse analytics queries
         - data_migrator: Generates ClickPipe configuration for migrating data from Postgres to ClickHouse. Does not do migration. It just generates the config json file.
 
+        YOU SHOULD NOT ASSUME THAT POSTGRES AND CLICKHOUSE WILL RETURN THE SAME DATA STUCTURES. It is likely the data will need to be parsed differently.
+        Under no circumstances should your use the `any` or `unknown` types in TypeScript or JavaScript. You should leverage strong types.
+
         The agents should run sequentially: ensure_clickhouse_client -> code_reader -> code_converter -> code_writer -> data_migrator.
         The coordinator can re-try and validate accordingly.
         The coordinator understands the output of each agent and provides the output if needed as input to the next agent.
@@ -53,7 +56,7 @@ class WorkflowOrchestrator:
         3. After each tool use, reflect on the results and adapt your approach
         4. Coordinate multiple agents as needed for comprehensive results
         5. Ensure accuracy by fact-checking when appropriate
-        6. Provide a comprehensive final response that addresses all aspects
+        6. Provide a comprehensive final response that addresses all aspects that includes the data migrator output
 
         Remember: Your thinking between tool calls helps you make better decisions.
         Use it to plan, evaluate results, and adjust your strategy.
