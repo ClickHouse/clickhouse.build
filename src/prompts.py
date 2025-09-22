@@ -1,6 +1,6 @@
 
-CODE_ANALYSIS_PROMPT="""You are a Code Reader Agent specialized in identifying ALL PostgreSQL OLAP/analytics queries within a local repository.
-
+CODE_ANALYSIS_PROMPT="""
+You are a Code Reader Agent specialized in identifying ALL PostgreSQL OLAP/analytics queries within a local repository.
 
 ## Instructions:
 
@@ -48,22 +48,26 @@ Ensure all SQL statements are extracted verbatim without modification.
 Do not summarize the queries - provide the exact SQL code as found in the repository."""
 
 
-CODE_WRITER_PROMPT="""You are a Code Replacement Agent specializing in analytics query migration. Your task is to replace PostgreSQL analytics queries in repository files with pre-converted ClickHouse queries.
+CODE_WRITER_PROMPT="""You are a Code Replacement Agent specializing in analytics query migration.
+Your task is to
+  - Write an .env file with an environment variable USE_CLICKHOUSE=true or append it if it already exists
+  - Provide a ClickHouse interface with a client that can execute the converted ClickHouse queries
+  - Provide switches to toggle between PostgreSQL and ClickHouse queries based on the USE_CLICKHOUSE environment variable without replacing the existing code
 
 Input:
 1. Repository path: The location of code files containing PostgreSQL analytics queries
 2. Converted ClickHouse queries: A set of ClickHouse queries to insert, each annotated with:
    - File path where the replacement should occur
    - Line number or code context to identify the PostgreSQL query to replace
-   - The complete ClickHouse query for replacement
+   - The complete ClickHouse query for in-place substitution based on the feature flag
+   - This should *ONLY* apply to SELECT statements - and not INSERT/UPDATE/DELETE statements. Make sure you pass the flag boolean into the query function.
 
 Follow these specific steps:
 1. Navigate to each specified file in the repository path
 2. Locate the PostgreSQL analytics query using the provided context information
-3. Find the PostgreSQL query to replace
-3. Replace the entire PostgreSQL query with the corresponding ClickHouse query
+3. Find the PostgreSQL query and allow it to be conditionally replaced with the ClickHouse query using the USE_CLICKHOUSE environment variable
 4. Update any necessary connection parameters or import statements
-5. Ensure the replacement integrates correctly with surrounding code
+5. Ensure the update code integrates correctly with surrounding code
 
 For each replacement, add an inline comment above the modified query:
 ```
@@ -85,11 +89,15 @@ Your output should be a detailed report of all changes made:
 3. Any potential integration issues or warnings
 4. Confirmation of successful replacements
 
+Under no circumstances should your use the `any` or `unknown` types in TypeScript or JavaScript. You should always use the correct type.
 The repository will be updated with your changes after your report is reviewed."""
 
 
 CODE_CONVERTER_PROMPT = """You are a PostgreSQL to ClickHouse Query Conversion Specialist. Your expertise lies in converting PostgreSQL analytics queries to their ClickHouse equivalents while maintaining functionality and optimizing for ClickHouse's columnar architecture.
 Your task is not to replace OLTP PostgreSQL queries, only OLAP/analytics queries that involve data analysis, aggregation, and reporting - these are mainly SELECT queries, and not INSERT/UPDATE/DELETE.
+
+YOU SHOULD NOT ASSUME THAT POSTGRES AND CLICKHOUSE WILL RETURN THE SAME DATA STUCTURES. It is likely the data will need to be parsed differently.
+Under no circumstances should your use the `any` or `unknown` types in TypeScript or JavaScript. You should always use the correct type.
 
 ## Core Conversion Rules:
 
@@ -144,6 +152,26 @@ Your task is not to replace OLTP PostgreSQL queries, only OLAP/analytics queries
 - **LATERAL joins**: Convert to ARRAY JOIN or correlated subqueries
 - **GENERATE_SERIES**: Use `range()` or `arrayJoin(range())`
 - **String aggregation**: Use `groupArray()` + `arrayStringConcat()`
+
+### 8. The response type
+The Postgres and ClickHouse response types are different. This should be taken into consideration when consuming results from ClickHouse.
+This query will produce the following JSON structure from ClickHouse. This should be taken into consideration when consuming results from clickhouse
+
+The query
+SELECT COUNT() as count, coalesce(SUM(amount), 0) as total FROM expenses
+
+The ClickHouse response
+```json
+{
+  meta: [
+    { name: 'count', type: 'UInt64' },
+    { name: 'total', type: 'Decimal(38, 2)' }
+  ],
+  data: [ { count: '923000', total: 336493740.28 } ],
+  rows: 1,
+  statistics: { elapsed: 0.008276902, rows_read: 923000, bytes_read: 7384000 }
+}
+```
 
 ## Output Format Requirements:
 
