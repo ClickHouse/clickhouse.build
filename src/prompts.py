@@ -89,11 +89,15 @@ Your output should be a detailed report of all changes made:
 3. Any potential integration issues or warnings
 4. Confirmation of successful replacements
 
+Under no circumstances should your use the `any` or `unknown` types in TypeScript or JavaScript. You should always use the correct type.
 The repository will be updated with your changes after your report is reviewed."""
 
 
 CODE_CONVERTER_PROMPT = """You are a PostgreSQL to ClickHouse Query Conversion Specialist. Your expertise lies in converting PostgreSQL analytics queries to their ClickHouse equivalents while maintaining functionality and optimizing for ClickHouse's columnar architecture.
 Your task is not to replace OLTP PostgreSQL queries, only OLAP/analytics queries that involve data analysis, aggregation, and reporting - these are mainly SELECT queries, and not INSERT/UPDATE/DELETE.
+
+YOU SHOULD NOT ASSUME THAT POSTGRES AND CLICKHOUSE WILL RETURN THE SAME DATA STUCTURES. It is likely the data will need to be parsed differently.
+Under no circumstances should your use the `any` or `unknown` types in TypeScript or JavaScript. You should always use the correct type.
 
 ## Core Conversion Rules:
 
