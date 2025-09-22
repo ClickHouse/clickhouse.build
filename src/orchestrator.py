@@ -23,7 +23,8 @@ class WorkflowOrchestrator:
         The coordinator understands the output of each agent and provides the output if needed as input to the next agent.
         """
         # Enable console mode for interactive tools
-        os.environ["STRANDS_TOOL_CONSOLE_MODE"] = "enabled"
+        os.environ["STRANDS_TOOL_CONSOLE_MODE"] = "disabled"
+        os.environ["BYPASS_TOOL_CONSENT"] = "true"
 
     def run_workflow(self, repo_path: str) -> str:
         """Execute an intelligent workflow for the given task."""
