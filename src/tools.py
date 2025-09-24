@@ -114,12 +114,12 @@ def code_converter(data: str) -> str:
 
         # Use structured_output method to get structured response
         result = code_converter_agent.structured_output(QueryConversionResult, data)
-        
+
         return result.model_dump_json(indent=2)
 
     except ValidationError as e:
         print(f"Validation Error: {e}")
-        
+
         # Try to get the raw response from the agent for fallback processing
         try:
             # Make a regular call to get the raw response
@@ -127,7 +127,7 @@ def code_converter(data: str) -> str:
             raw_data = str(raw_result)
         except Exception:
             raw_data = "Could not retrieve raw response"
-        
+
         # Create a structured error response that includes the raw data for workflow continuation
         validation_error_result = QueryConversionResult(
             converted_queries=[],
@@ -142,7 +142,7 @@ def code_converter(data: str) -> str:
             ]
         )
         return validation_error_result.model_dump_json(indent=2)
-        
+
     except Exception as e:
         print(f"Error: {e}")
         error_result = QueryConversionResult(
@@ -388,10 +388,10 @@ def ensure_clickhouse_client(repo_path: str) -> str:
 def browse_clickhouse_documentation(section: str = "js-client") -> str:
     """
     Fetch ClickHouse documentation pages to get detailed information.
-    
+
     Args:
         section: Documentation section to fetch
-    
+
     Returns:
         Content from the documentation page
     """
@@ -400,17 +400,17 @@ def browse_clickhouse_documentation(section: str = "js-client") -> str:
         doc_url = CONFIG["clickhouse_urls"]["documentation"].get(section)
         if not doc_url:
             doc_url = f"{CONFIG['clickhouse_urls']['base_docs']}"
-        
+
         http_agent = Agent(
             model=BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0"),
             system_prompt=DOCUMENTATION_ANALYSIS_PROMPT.format(section=section),
             tools=[http_request],
             callback_handler=get_callback_handler()
         )
-        
+
         result = http_agent(f"Fetch {doc_url} and extract comprehensive documentation content for the {section} section from the HTML")
         return str(result)
-        
+
     except Exception as e:
         return f"Error fetching documentation: {str(e)}"
 
@@ -418,24 +418,23 @@ def browse_clickhouse_documentation(section: str = "js-client") -> str:
 def get_clickhouse_documentation(sections: str = "js-client,getting-started") -> str:
     """
     Get ClickHouse documentation information using http requests.
-    
+
     Args:
         sections: Comma-separated list of documentation sections to fetch.
                  Available sections are defined in config.yaml under clickhouse_urls.documentation
-    
+
     Returns:
         Formatted documentation information
     """
     try:
         section_list = [s.strip() for s in sections.split(',') if s.strip()]
-        
+
         results = []
         for section in section_list:
             doc_result = browse_clickhouse_documentation(section)
             results.append(f"=== {section.upper()} DOCUMENTATION ===\n{doc_result}\n")
-        
+
         return "\n".join(results)
-        
+
     except Exception as e:
         return f"Error fetching ClickHouse documentation: {str(e)}"
-

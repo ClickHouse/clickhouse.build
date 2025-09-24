@@ -176,7 +176,7 @@ The ClickHouse response
 ## Important guidelines:
 - Follow programmic best practices
 - First convert the queries according to your knowledge and rules
-- Then use the get_clickhouse_documentation tool to visit the clickhouse SQL Reference and understand if you need to update the converted queries using latest updates in the documentation. 
+- Then use the get_clickhouse_documentation tool to visit the clickhouse SQL Reference and understand if you need to update the converted queries using latest updates in the documentation.
 
 
 ## Output Format Requirements:
