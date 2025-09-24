@@ -19,32 +19,32 @@ Examples:
   python main.py --path ./proj --mode auto  # Specific path in auto mode
         """
     )
-    
+
     parser.add_argument(
         "--path",
         default=".",
         help="Path to the repository to analyze and migrate (default: current directory)"
     )
-    
+
     parser.add_argument(
         "--mode",
         choices=["conversational", "auto"],
         default="conversational",
         help="Execution mode: conversational (interactive) or auto (automated)"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Validate repository path
     repo_path = Path(args.path).resolve()
     if not repo_path.exists():
         print(f"Error: Repository path '{args.path}' does not exist")
         sys.exit(1)
-    
+
     if not repo_path.is_dir():
         print(f"Error: '{args.path}' is not a directory")
         sys.exit(1)
-    
+
     print("ClickHouse Build: PostgreSQL to ClickHouse Migration Tool")
     print("=" * 60)
     print(f"Repository: {repo_path}")
@@ -52,9 +52,9 @@ Examples:
     print()
 
     try:
-        # Create orchestrator
-        orchestrator = WorkflowOrchestrator()
-        
+        # Create orchestrator with mode
+        orchestrator = WorkflowOrchestrator(mode=args.mode)
+
         # Run in the specified mode
         if args.mode == "conversational":
             orchestrator.run_conversational(str(repo_path))
@@ -64,7 +64,7 @@ Examples:
             result = orchestrator.run_workflow(str(repo_path))
             print("Migration workflow completed!")
             print(result)
-        
+
     except KeyboardInterrupt:
         print("\nMigration cancelled by user")
         sys.exit(0)

@@ -5,7 +5,8 @@ from .tools import code_reader, code_converter, code_writer, data_migrator, ensu
 from .utils import get_callback_handler
 
 class WorkflowOrchestrator:
-    def __init__(self):
+    def __init__(self, mode: str = "conversational"):
+        self.mode = mode
         self.system_prompt = """You are an intelligent workflow orchestrator with access to specialist agents.
 
         Your role is to intelligently coordinate a workflow using these specialist agents:
@@ -22,9 +23,15 @@ class WorkflowOrchestrator:
         The coordinator can re-try and validate accordingly.
         The coordinator understands the output of each agent and provides the output if needed as input to the next agent.
         """
-        # Enable console mode for interactive tools
-        os.environ["STRANDS_TOOL_CONSOLE_MODE"] = "disabled"
-        os.environ["BYPASS_TOOL_CONSENT"] = "true"
+        # Set console mode from environment or default to enabled
+        os.environ["STRANDS_TOOL_CONSOLE_MODE"] = os.getenv("STRANDS_TOOL_CONSOLE_MODE", "enabled")
+        
+        # Set BYPASS_TOOL_CONSENT based on mode
+        if mode == "auto":
+            os.environ["BYPASS_TOOL_CONSENT"] = "true"
+        else:
+            # Get from environment or default to false for conversational mode
+            os.environ["BYPASS_TOOL_CONSENT"] = os.getenv("BYPASS_TOOL_CONSENT", "false")
 
     def run_workflow(self, repo_path: str) -> str:
         """Execute an intelligent workflow for the given task."""
