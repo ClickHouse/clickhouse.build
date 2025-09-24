@@ -65,6 +65,16 @@ Examples:
             print("Migration workflow completed!")
             print(result)
         
+        # Run in the specified mode
+        if args.mode == "conversational":
+            orchestrator.run_conversational(str(repo_path))
+        else:
+            # Auto mode - run the full workflow automatically
+            print("Starting automated migration workflow...")
+            result = orchestrator.run_workflow(str(repo_path))
+            print("Migration workflow completed!")
+            print(result)
+        
     except KeyboardInterrupt:
         print("\nMigration cancelled by user")
         sys.exit(0)
