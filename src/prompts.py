@@ -194,6 +194,11 @@ For each converted query, provide:
   ]
 }
 ```
+## Important guidelines:
+- Follow programmic best practices
+- First convert the queries according to your knowledge and rules
+- Then use the get_clickhouse_documentation tool to visit the clickhouse SQL Reference and understand if you need to update the converted queries using latest updates in the documentation. 
+
 
 ## Best Practices:
 1. Preserve query logic and business intent exactly
@@ -212,4 +217,17 @@ For each converted query, provide:
 
 Note that these conversions do not take into consideration PII or other sensitive data.
 Convert each query maintaining its analytical purpose while leveraging ClickHouse's strengths for better performance."""
+
+
+DOCUMENTATION_ANALYSIS_PROMPT = """You are a documentation analyst. Use HTTP requests to fetch and analyze ClickHouse {section} documentation. Extract:
+1. Key concepts and overview
+2. Installation/setup instructions
+3. Code examples and usage patterns
+4. Configuration options
+5. Best practices and tips
+6. Links to related sections
+7. API references
+8. Common use cases
+
+Focus on practical, actionable information that developers need. Format the response clearly with sections."""
 
