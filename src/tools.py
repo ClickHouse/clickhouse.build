@@ -10,7 +10,7 @@ from strands.tools.mcp import MCPClient
 from mcp import stdio_client, StdioServerParameters
 from strands_tools import shell, file_write, editor, http_request
 from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT, DOCUMENTATION_ANALYSIS_PROMPT
-from .utils import get_callback_handler, get_mcp_log_level, CONFIG
+from .utils import get_callback_handler, get_mcp_log_level, CONFIG, check_aws_credentials
 
 @tool
 def code_reader(repo_path: str) -> str:
@@ -23,6 +23,11 @@ def code_reader(repo_path: str) -> str:
     Returns:
         Reading findings
     """
+    # Check AWS credentials before proceeding
+    creds_available, error_message = check_aws_credentials()
+    if not creds_available:
+        return f"Error: {error_message}"
+
     bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
 
     try:
@@ -71,6 +76,11 @@ def code_converter(data: str) -> str:
     Returns:
         JSON-formatted converted queries with detailed conversion notes and warnings
     """
+    # Check AWS credentials before proceeding
+    creds_available, error_message = check_aws_credentials()
+    if not creds_available:
+        return json.dumps({"error": error_message})
+
     bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
 
     try:

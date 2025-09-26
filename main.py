@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 from src.orchestrator import WorkflowOrchestrator
+from src.utils import check_aws_credentials
 
 def main():
     parser = argparse.ArgumentParser(
@@ -49,6 +50,15 @@ Examples:
     print("=" * 60)
     print(f"Repository: {repo_path}")
     print(f"Mode: {args.mode}")
+    print()
+
+    # Check AWS credentials before proceeding
+    print("Checking AWS credentials...")
+    creds_available, error_message = check_aws_credentials()
+    if not creds_available:
+        print(f"Error: {error_message}")
+        sys.exit(1)
+    print("✓ AWS credentials found and valid")
     print()
 
     try:

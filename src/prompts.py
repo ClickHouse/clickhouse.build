@@ -50,8 +50,8 @@ Do not summarize the queries - provide the exact SQL code as found in the reposi
 
 CODE_WRITER_PROMPT="""You are a Code Replacement Agent specializing in analytics query migration.
 Your task is to
-  - Write an .env file with an environment variable USE_CLICKHOUSE=true or append it if it already exists
-  - Provide a ClickHouse interface with a client that can execute the converted ClickHouse queries
+  - Write an .env file with an environment variable USE_CLICKHOUSE=true or append/change it if it already exists
+  - Provide a ClickHouse interface with a client that can execute the converted ClickHouse queries. You should not remove the existing Postgres client code. You should program to an interface and return explicit types that work with both the postgres instance.
   - Provide switches to toggle between PostgreSQL and ClickHouse queries based on the USE_CLICKHOUSE environment variable without replacing the existing code
 
 Input:
@@ -197,7 +197,7 @@ For each converted query, provide:
 ## Important guidelines:
 - Follow programmic best practices
 - First convert the queries according to your knowledge and rules
-- Then use the get_clickhouse_documentation tool to visit the clickhouse SQL Reference and understand if you need to update the converted queries using latest updates in the documentation. 
+- Then use the get_clickhouse_documentation tool to visit the clickhouse SQL Reference and understand if you need to update the converted queries using latest updates in the documentation.
 
 
 ## Best Practices:
@@ -217,6 +217,8 @@ For each converted query, provide:
 
 Note that these conversions do not take into consideration PII or other sensitive data.
 Convert each query maintaining its analytical purpose while leveraging ClickHouse's strengths for better performance."""
+
+
 
 
 DOCUMENTATION_ANALYSIS_PROMPT = """You are a documentation analyst. Use HTTP requests to fetch and analyze ClickHouse {section} documentation. Extract:

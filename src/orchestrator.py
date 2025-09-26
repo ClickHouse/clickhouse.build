@@ -2,7 +2,7 @@ import os
 from strands import Agent
 from strands.models import BedrockModel
 from .tools import code_reader, code_converter, code_writer, data_migrator, ensure_clickhouse_client
-from .utils import get_callback_handler
+from .utils import get_callback_handler, check_aws_credentials
 
 class WorkflowOrchestrator:
     def __init__(self, mode: str = "conversational"):
@@ -25,7 +25,7 @@ class WorkflowOrchestrator:
         """
         # Set console mode from environment or default to enabled
         os.environ["STRANDS_TOOL_CONSOLE_MODE"] = os.getenv("STRANDS_TOOL_CONSOLE_MODE", "enabled")
-        
+
         # Set BYPASS_TOOL_CONSENT based on mode
         if mode == "auto":
             os.environ["BYPASS_TOOL_CONSENT"] = "true"
