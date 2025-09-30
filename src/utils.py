@@ -17,19 +17,6 @@ def get_callback_handler():
         return PrintingCallbackHandler()
 
 
-def get_mcp_log_level():
-    """
-    Returns the appropriate MCP log level based on environment.
-    In dev: returns DEBUG for detailed logging
-    In prod: returns ERROR for minimal logging
-    """
-    env = os.getenv("ENVIRONMENT", "dev").lower()
-    if env == "prod":
-        return "ERROR"
-    else:
-        return "DEBUG"
-
-
 def load_config():
     """Load configuration from config.yaml file."""
     project_root = Path(__file__).parent.parent
