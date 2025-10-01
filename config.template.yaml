@@ -6,3 +6,6 @@ clickhouse_urls:
     getting-started: "https://clickhouse.com/docs/en/getting-started"
     sql-reference: "https://clickhouse.com/docs/en/sql-reference"
   base_docs: "https://clickhouse.com/docs/en"
+
+settings:
+  chbuild_directory: ".chbuild"  # Output directory for reports, logs, and results

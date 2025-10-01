@@ -12,3 +12,7 @@ src/chat_ui/__pycache__/
 test/pg-expense-prisma/node_modules/
 .kiro/
 logs/
+.chbuild/
+test/pg-expense-direct/planning_results/
+test/pg-expense-drizzleorm/planning_results/
+test/pg-expense-prisma/planning_results/

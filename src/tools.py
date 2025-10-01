@@ -629,7 +629,6 @@ def browse_clickhouse_documentation(section: str = "js-client") -> str:
         http_agent = Agent(
             model=BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0"),
             system_prompt=DOCUMENTATION_ANALYSIS_PROMPT.format(section=section),
-            tools=[http_request],
             callback_handler=get_callback_handler()
         )
 

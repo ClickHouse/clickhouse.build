@@ -38,6 +38,13 @@ Examples:
         help="Use interactive chat UI interface"
     )
 
+    # Add planning mode argument
+    parser.add_argument(
+        "--planning-mode",
+        action="store_true",
+        help="Run in planning mode (analysis only, no file changes)"
+    )
+
     # Parse known args to handle interface selection first
     args, remaining = parser.parse_known_args()
     
@@ -54,14 +61,17 @@ Examples:
     if args.cli:
         # Use CLI interface
         from src.cli import run_cli
-        # Re-parse with CLI arguments
-        sys.argv = [sys.argv[0]] + remaining
+        # Re-parse with CLI arguments, preserving planning mode
+        cli_args = [sys.argv[0]] + remaining
+        if args.planning_mode:
+            cli_args.append("--planning-mode")
+        sys.argv = cli_args
         run_cli()
     else:
         # Use Chat UI interface (default)
         try:
             from src.chat_ui import ChatApp
-            app = ChatApp()
+            app = ChatApp(planning_mode=args.planning_mode)
             app.run()
         except ImportError as e:
             print(f"Error: Chat UI dependencies not available: {e}")

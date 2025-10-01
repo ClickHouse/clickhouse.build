@@ -9,7 +9,6 @@ from pathlib import Path
 from .orchestrator import WorkflowOrchestrator
 from .logging_config import setup_logging, LogLevel
 
-
 def run_cli():
     """Run the CLI interface."""
     parser = argparse.ArgumentParser(
@@ -22,6 +21,8 @@ Examples:
   python main.py --cli --path ./my-project    # CLI mode, analyze relative path
   python main.py --cli --mode auto            # CLI mode, current directory in auto mode
   python main.py --cli --path ./proj --mode auto  # CLI mode, specific path in auto mode
+  python main.py --cli --planning-mode        # Planning mode, analysis only without changes
+  python main.py --cli --path ./proj --planning-mode  # Planning mode for specific path
         """
     )
 
@@ -45,6 +46,12 @@ Examples:
         help="File approval mode: interactive (prompt for each change) or automatic (auto-approve all changes)"
     )
 
+    parser.add_argument(
+        "--planning-mode",
+        action="store_true",
+        help="Run in planning mode (analysis only, no file changes)"
+    )
+
     args = parser.parse_args()
 
     # Validate repository path
@@ -62,6 +69,8 @@ Examples:
     print(f"📁 Repository: {repo_path}")
     print(f"🔧 Mode: {args.mode}")
     print(f"📋 Approval Mode: {args.approval_mode}")
+    if args.planning_mode:
+        print("📋 Planning Mode: ENABLED (analysis only, no file changes)")
     print()
 
     # Set up centralized logging for CLI mode
@@ -72,11 +81,18 @@ Examples:
     )
 
     try:
-        # Create orchestrator with mode
-        orchestrator = WorkflowOrchestrator(mode=args.mode)
+        # Create orchestrator with mode and planning mode
+        orchestrator = WorkflowOrchestrator(mode=args.mode, planning_mode=args.planning_mode)
+        print(f"🔧 DEBUG: Planning mode flag = {args.planning_mode}")
 
         # Run in the specified mode
-        if args.mode == "interactive":
+        if args.planning_mode:
+            # Planning mode takes precedence over other modes
+            print("🚀 Starting planning mode analysis...")
+            result = orchestrator.run_planning_workflow(str(repo_path))
+            print("🎉 Planning analysis completed!")
+            print(result)
+        elif args.mode == "interactive":
             orchestrator.run_conversational(str(repo_path))
         else:
             # Auto mode - run the full workflow automatically

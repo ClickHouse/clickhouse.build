@@ -48,7 +48,9 @@ class LoggerConfig:
             backup_count: Number of backup files to keep
             format_string: Custom format string for log messages
         """
-        self.log_dir = log_dir or Path.cwd() / "logs"
+        # Import here to avoid circular imports
+        from .utils import get_chbuild_directory
+        self.log_dir = log_dir or Path(get_chbuild_directory()) / "logs"
         self.log_level = log_level
         self.console_output = console_output
         self.file_output = file_output

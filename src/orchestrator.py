@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import subprocess
 from datetime import datetime
 from typing import Optional, Dict, Any
 from strands import Agent
@@ -10,12 +11,13 @@ from .utils import get_callback_handler, check_aws_credentials
 from .logging_config import get_logger, setup_logging, LogLevel
 
 class WorkflowOrchestrator:
-    def __init__(self, mode: str = "interactive", callback_handler=None, tui_mode: bool = False, app_instance=None):
+    def __init__(self, mode: str = "interactive", callback_handler=None, tui_mode: bool = False, app_instance=None, planning_mode: bool = False):
         self.mode = mode
         self.custom_callback_handler = callback_handler
         self.tui_mode = tui_mode
         self.cancelled = False  # Cancellation flag
         self.app_instance = app_instance
+        self.planning_mode = planning_mode
 
         # Track pending file changes for approval
         self.approval_paused = False
@@ -47,6 +49,20 @@ class WorkflowOrchestrator:
         The coordinator can re-try and validate accordingly.
         The coordinator understands the output of each agent and provides the output if needed as input to the next agent.
         """
+
+        # Planning mode system prompt
+        self.planning_system_prompt = """You are an intelligent workflow orchestrator with access to specialist agents.
+
+Your role is to coordinate a PLANNING workflow using these specialist agents:
+- code_reader: Reads a repository content and searches for all postgres analytics queries and table creation scripts
+- code_converter: Converts the found postgres analytics queries to ClickHouse analytics queries
+
+YOU ARE RUNNING IN PLANNING MODE. Do not make any changes to files or configurations.
+Your goal is to analyze the repository and generate conversion plans.
+
+The agents should run sequentially: code_reader -> code_converter.
+After both agents complete, provide a comprehensive analysis report.
+"""
 
         # Use default callback handler if none provided
         if callback_handler is None:
@@ -300,6 +316,350 @@ class WorkflowOrchestrator:
             self._errors.append(str(e))
             self._create_migration_results(False, start_time if 'start_time' in locals() else datetime.now(), end_time)
             return f"Workflow failed: {e}"
+
+    def run_planning_workflow(self, repo_path: str) -> str:
+        """Execute planning workflow (code_reader + code_converter only)."""
+        
+        start_time = datetime.now()
+        self.logger.info(f"🚀 Starting planning workflow for: {repo_path}")
+        self.logger.info("📋 Planning Mode: Analysis only - no file modifications will be made")
+        
+        code_reader_output = ""
+        code_converter_output = ""
+        
+        try:
+            # Ensure output directory exists
+            self._ensure_planning_output_directory(repo_path)
+            
+            # Create agent with planning-specific system prompt and limited tools
+            planning_tools = [code_reader, code_converter]
+            claude4_model = BedrockModel(
+                model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
+                max_tokens=4096,
+                temperature=1,
+                additional_request_fields={
+                    "anthropic_beta": ["interleaved-thinking-2025-05-14"],
+                    "reasoning_config": {
+                        "type": "enabled",
+                        "budget_tokens": 3000
+                    }
+                }
+            )
+            agent = Agent(
+                model=claude4_model,
+                tools=planning_tools,
+                system_prompt=self.planning_system_prompt,
+                callback_handler=self.custom_callback_handler,
+            )
+
+            # Execute planning workflow
+            self.logger.info("🔍 Step 1/3: Executing code reader analysis...")
+            try:
+                prompt = f"PLANNING MODE: Analyze the repository at {repo_path} using ONLY code_reader and code_converter tools. Find PostgreSQL queries and convert them to ClickHouse format. DO NOT use ensure_clickhouse_client, code_writer, or data_migrator tools. This is analysis only - make no file changes."
+                result = agent(prompt)
+                
+                if self.cancelled:
+                    self.logger.warning("Planning workflow cancelled during execution")
+                    return "Planning workflow cancelled during execution"
+                
+                # Extract tool outputs from agent execution
+                result_str = str(result)
+                code_reader_output = result_str
+                code_converter_output = result_str
+                
+                self.logger.info("✅ Step 1/3: Code analysis completed")
+                
+            except Exception as e:
+                self.logger.error(f"❌ Planning workflow execution failed: {e}")
+                raise
+
+            # Generate planning report using AI
+            self.logger.info("📊 Step 2/3: Generating planning report with AI...")
+            try:
+                planning_report = self._generate_ai_planning_report(repo_path, code_reader_output, code_converter_output)
+                self.logger.info("✅ Step 2/3: AI planning report generated")
+                
+            except Exception as e:
+                self.logger.error(f"❌ AI planning report generation failed: {e}")
+                # Continue with a basic report
+                planning_report = f"# Planning Report Generation Error\n\nFailed to generate detailed report: {str(e)}\n\n## Raw Analysis Output\n\n{result_str}"
+            
+            # Save planning report
+            self.logger.info("💾 Step 3/3: Saving planning results...")
+            try:
+                report_path = self._save_planning_report(repo_path, planning_report)
+                self.logger.info(f"✅ Step 3/3: Planning results saved to {report_path}")
+                
+            except Exception as e:
+                self.logger.error(f"❌ Failed to save planning report: {e}")
+                # Still return the report content even if saving failed
+            
+            # Log planning results summary
+            self._log_planning_summary(repo_path, code_reader_output, code_converter_output)
+            
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            self.logger.info(f"🎉 Planning workflow completed successfully in {duration:.2f} seconds")
+            
+            return planning_report
+
+        except Exception as e:
+            self.logger.error(f"❌ Planning workflow failed: {e}")
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            self.logger.error(f"⏱️ Planning workflow failed after {duration:.2f} seconds")
+            
+            # Create error report
+            error_report = f"""# Planning Workflow Error Report
+
+## Error Details
+- **Error**: {str(e)}
+- **Repository**: {repo_path}
+- **Duration**: {duration:.2f} seconds
+- **Timestamp**: {datetime.now().isoformat()}
+
+## Partial Results
+- **Code Reader Output**: {"Available" if code_reader_output else "Not available"}
+- **Code Converter Output**: {"Available" if code_converter_output else "Not available"}
+
+## Raw Output
+```
+{code_reader_output if code_reader_output else "No output captured"}
+```
+"""
+            
+            # Try to save error report
+            try:
+                self._save_planning_report(repo_path, error_report, is_error=True)
+            except:
+                pass  # Don't fail on error report saving
+            
+            return error_report
+
+    def _ensure_planning_output_directory(self, repo_path: str) -> None:
+        """Ensure planning output directory exists."""
+        try:
+            from pathlib import Path
+            from .utils import get_chbuild_directory
+            
+            chbuild_dir = get_chbuild_directory()
+            results_dir = Path(chbuild_dir)
+            results_dir.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"📁 Planning output directory ready: {results_dir}")
+        except Exception as e:
+            self.logger.error(f"Failed to create planning output directory: {e}")
+            raise
+
+    def _log_planning_summary(self, repo_path: str, code_reader_output: str, code_converter_output: str) -> None:
+        """Log planning results summary."""
+        try:
+            # Count queries found
+            query_indicators = ['SELECT', 'INSERT', 'UPDATE', 'DELETE']
+            query_count = sum(code_reader_output.upper().count(indicator) for indicator in query_indicators)
+            
+            # Count files analyzed
+            file_count = code_reader_output.count('File:') if 'File:' in code_reader_output else 0
+            
+            # Log summary
+            self.logger.info("📊 Planning Results Summary:")
+            self.logger.info(f"   📁 Repository: {repo_path}")
+            self.logger.info(f"   📄 Files analyzed: {file_count}")
+            self.logger.info(f"   🔍 Queries found: {query_count}")
+            self.logger.info(f"   📝 Code reader output: {len(code_reader_output)} characters")
+            self.logger.info(f"   🔄 Code converter output: {len(code_converter_output)} characters")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to log planning summary: {e}")
+
+    def _generate_ai_planning_report(self, repo_path: str, code_reader_output: str, code_converter_output: str) -> str:
+        """Generate planning report using AI to analyze the raw outputs."""
+        try:
+            # Get git hash from the repository directory
+            try:
+                git_hash = subprocess.check_output(
+                    ['git', 'rev-parse', '--short', 'HEAD'],
+                    cwd=repo_path,
+                    stderr=subprocess.DEVNULL
+                ).decode('ascii').strip()
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                git_hash = "unknown"
+            # Create a specialized agent for report generation
+            report_agent = Agent(
+                model=BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0"),
+                system_prompt=f"""You are a technical report generator specializing in PostgreSQL to ClickHouse migration planning reports.
+
+Your task is to analyze the outputs from code analysis and query conversion tools, then generate a comprehensive, well-structured migration planning report in Markdown format.
+
+## EXACT Report Structure Required (follow this structure precisely):
+
+# Migration Planning Report
+
+## Metadata
+
+- **UUID**: [Generate a unique UUID]
+- **Epoch**: [Current Unix timestamp]
+- **Repository Path**: [Extract from context]
+- **Technologies**: [Comma-separated list: Next.js, TypeScript, React, etc.]
+- **ORMs**: [Comma-separated list: Drizzle, Prisma, etc. or empty if none]
+- **Commit**: {git_hash}
+
+## Summary
+
+[Provide a concise overview of the application type and migration scope. Include query count found.]
+
+## Tables
+
+[For each table/schema found:]
+### [Table Name]
+
+**File**: [Source file path]
+
+```typescript
+[Table schema definition]
+```
+
+[If no tables found, write: "No table definitions found."]
+
+## Queries
+
+[For each query found:]
+### Query [N]
+
+**File**: [Source file path]
+**Type**: [Query type: analytics, select, etc.]
+
+[If context available:]
+**Context**: [Where the query appears]
+
+#### Before Conversion
+
+```sql
+[Original PostgreSQL query - extract the actual SQL]
+```
+
+#### After Conversion
+
+```sql
+[Converted ClickHouse query - extract the actual SQL]
+```
+
+[If conversion notes available:]
+**Conversion Notes**:
+[List each note as bullet points]
+
+[If warnings available:]
+**Warnings**:
+[List each warning as bullet points with ⚠️ emoji]
+
+---
+
+## Data
+
+### Databases
+- PostgreSQL (source)
+- ClickHouse (target)
+
+### Schemas
+- Analysis based on discovered table definitions
+
+### Tables
+[List each table found, or "- No tables identified" if none]
+
+### Sorting Keys
+- To be determined based on query patterns and performance requirements
+
+IMPORTANT: Extract ALL queries mentioned in the analysis. If the analysis mentions "4 queries found" then show all 4 queries with their before/after conversions. Be thorough and extract the actual SQL code from the outputs.""",
+                callback_handler=self.custom_callback_handler,
+            )
+
+            # Prepare the analysis data
+            import time
+            import uuid
+            
+            current_uuid = str(uuid.uuid4())
+            current_epoch = int(time.time())
+            
+            prompt = f"""Generate a comprehensive migration planning report based on the following analysis outputs.
+
+CRITICAL: The analysis mentions finding multiple queries. Extract ALL of them with their before/after conversions.
+
+## Repository Path
+{repo_path}
+
+## Code Reader Analysis Output
+{code_reader_output}
+
+## Code Converter Analysis Output  
+{code_converter_output}
+
+## Report Metadata to Use
+- UUID: {current_uuid}
+- Epoch: {current_epoch}
+
+INSTRUCTIONS:
+1. Follow the EXACT structure provided in your system prompt
+2. Extract ALL queries mentioned in the outputs (if it says "4 queries found", show all 4)
+3. For each query, extract the actual SQL code from both before and after sections
+4. Include all conversion notes and warnings mentioned
+5. Extract table schemas if any are shown
+6. Identify technologies and ORMs from the analysis
+7. Be thorough - don't miss any information from the outputs
+
+Generate the complete migration planning report now."""
+
+            # Generate the report
+            report = report_agent(prompt)
+            return str(report)
+            
+        except Exception as e:
+            self.logger.error(f"Error generating AI planning report: {e}")
+            # Fallback to basic report
+            return f"""# Migration Planning Report (AI Generation Failed)
+
+## Error
+Failed to generate AI report: {str(e)}
+
+## Repository
+{repo_path}
+
+## Code Reader Output
+```
+{code_reader_output[:2000]}{'...' if len(code_reader_output) > 2000 else ''}
+```
+
+## Code Converter Output  
+```
+{code_converter_output[:2000]}{'...' if len(code_converter_output) > 2000 else ''}
+```
+"""
+
+    def _save_planning_report(self, repo_path: str, report_content: str, is_error: bool = False) -> str:
+        """Save planning report to file."""
+        try:
+            from pathlib import Path
+            import os
+            from .utils import get_chbuild_directory
+            
+            # Create chbuild output directory
+            chbuild_dir = get_chbuild_directory()
+            results_dir = Path(chbuild_dir)
+            results_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            prefix = "error_report" if is_error else "planning_report"
+            report_file = results_dir / f"{prefix}_{timestamp}.md"
+            
+            # Write report
+            with open(report_file, 'w', encoding='utf-8') as f:
+                f.write(report_content)
+            
+            self.logger.info(f"📄 Planning report saved to: {report_file}")
+            return str(report_file)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save planning report: {e}")
+            return ""
 
     async def run_workflow_with_events(self, repo_path: str):
         """Execute workflow with async event streaming for UI updates."""

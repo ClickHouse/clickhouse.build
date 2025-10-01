@@ -72,3 +72,12 @@ def check_aws_credentials():
 
 # Export configuration object
 CONFIG = load_config()
+
+
+def get_chbuild_directory():
+    """Get the configured chbuild directory from config.yaml."""
+    try:
+        return CONFIG.get('settings', {}).get('chbuild_directory', '.')
+    except:
+        # Fallback to current directory if config is not available
+        return '.'
