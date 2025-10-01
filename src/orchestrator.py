@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 from strands import Agent
 from strands.models import BedrockModel
 from .tools import code_reader, code_converter, code_writer, data_migrator, ensure_clickhouse_client
-from .utils import get_callback_handler
+from .utils import get_callback_handler, check_aws_credentials
 from .logging_config import get_logger, setup_logging, LogLevel
 
 class WorkflowOrchestrator:
@@ -203,6 +203,7 @@ class WorkflowOrchestrator:
             os.environ["STRANDS_TOOL_CONSOLE_MODE"] = os.getenv("STRANDS_TOOL_CONSOLE_MODE", "enabled")
 
         os.environ["BYPASS_TOOL_CONSENT"]="true"
+
         # Set BYPASS_TOOL_CONSENT based on mode
         if self.mode == "auto":
             os.environ["BYPASS_TOOL_CONSENT"] = "true"

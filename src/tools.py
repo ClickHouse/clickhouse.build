@@ -10,10 +10,9 @@ from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from mcp import stdio_client, StdioServerParameters
 from strands_tools import shell, http_request, editor, file_write
-from .utils import get_callback_handler, CONFIG
+from .utils import get_callback_handler, CONFIG, check_aws_credentials
 from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT, DOCUMENTATION_ANALYSIS_PROMPT
 
-# Logger
 logger = logging.getLogger(__name__)
 
 def _get_user_approval(file_path: str, content: str, original_content: str = "", change_type: str = "update", detailed_prompt: str = None) -> str:
@@ -203,6 +202,12 @@ def code_reader(repo_path: str) -> str:
         Reading findings
     """
     logger.info(f"Code reader starting analysis of repository: {repo_path}")
+    
+    # Check AWS credentials before proceeding
+    creds_available, error_message = check_aws_credentials()
+    if not creds_available:
+        return f"Error: {error_message}"
+
     bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
 
     try:
@@ -254,6 +259,11 @@ def code_converter(data: str) -> str:
         JSON-formatted converted queries with detailed conversion notes and warnings
     """
     logger.info("Code converter starting PostgreSQL to ClickHouse conversion")
+    # Check AWS credentials before proceeding
+    creds_available, error_message = check_aws_credentials()
+    if not creds_available:
+        return json.dumps({"error": error_message})
+
     bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
 
     try:

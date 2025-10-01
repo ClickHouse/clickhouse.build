@@ -2,7 +2,9 @@
 
 import argparse
 import sys
-
+from pathlib import Path
+from src.orchestrator import WorkflowOrchestrator
+from src.utils import check_aws_credentials
 
 def main():
     """Main entry point - choose between TUI and CLI interfaces."""
@@ -38,6 +40,15 @@ Examples:
 
     # Parse known args to handle interface selection first
     args, remaining = parser.parse_known_args()
+    
+    # Check AWS credentials before proceeding
+    print("Checking AWS credentials...")
+    creds_available, error_message = check_aws_credentials()
+    if not creds_available:
+        print(f"Error: {error_message}")
+        sys.exit(1)
+    print("✓ AWS credentials found and valid")
+    print()
 
     # Determine interface
     if args.cli:
