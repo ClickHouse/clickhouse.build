@@ -84,7 +84,7 @@ The tool will:
 
 - `--path`: Path to the repository to analyze (default: current directory)
 - `--mode`: Execution mode
-  - `conversational` (default): Interactive mode with back-and-forth
+  - `interactive` (default): Interactive mode with back-and-forth
   - `auto`: Automated workflow execution
 
 ## Configuration

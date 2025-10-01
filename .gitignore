@@ -6,3 +6,9 @@ src/__pycache__/
 .ipynb_checkpoints/
 .next
 config.yaml
+src/chat_ui/screens/__pycache__/
+src/chat_ui/widgets/__pycache__/
+src/chat_ui/__pycache__/
+test/pg-expense-prisma/node_modules/
+.kiro/
+logs/
