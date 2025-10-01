@@ -1,57 +1,46 @@
 #!/usr/bin/env python3
 
 import argparse
-import os
 import sys
 from pathlib import Path
 from src.orchestrator import WorkflowOrchestrator
 from src.utils import check_aws_credentials
 
 def main():
+    """Main entry point - choose between TUI and CLI interfaces."""
     parser = argparse.ArgumentParser(
         description="ClickHouse Build: PostgreSQL to ClickHouse Migration Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Interface Options:
+  python main.py              # Launch TUI interface (default)
+  python main.py --chat       # Launch interactive chat UI
+  python main.py --cli        # Use CLI interface
+
 Examples:
-  python main.py                        # Analyze current directory
-  python main.py --path /path/to/repo   # Analyze specific path
-  python main.py --path ./my-project    # Analyze relative path
-  python main.py --mode auto            # Run current directory in auto mode
-  python main.py --path ./proj --mode auto  # Specific path in auto mode
+  python main.py --chat       # Interactive chat with approval system
+  python main.py --cli --path /path/to/repo --mode auto
+  python main.py --cli --mode interactive
         """
     )
 
-    parser.add_argument(
-        "--path",
-        default=".",
-        help="Path to the repository to analyze and migrate (default: current directory)"
+    # Interface selection
+    interface_group = parser.add_mutually_exclusive_group()
+    interface_group.add_argument(
+        "--cli",
+        action="store_true",
+        help="Use CLI interface"
     )
 
-    parser.add_argument(
-        "--mode",
-        choices=["conversational", "auto"],
-        default="conversational",
-        help="Execution mode: conversational (interactive) or auto (automated)"
+    interface_group.add_argument(
+        "--chat",
+        action="store_true",
+        help="Use interactive chat UI interface"
     )
 
-    args = parser.parse_args()
-
-    # Validate repository path
-    repo_path = Path(args.path).resolve()
-    if not repo_path.exists():
-        print(f"Error: Repository path '{args.path}' does not exist")
-        sys.exit(1)
-
-    if not repo_path.is_dir():
-        print(f"Error: '{args.path}' is not a directory")
-        sys.exit(1)
-
-    print("ClickHouse Build: PostgreSQL to ClickHouse Migration Tool")
-    print("=" * 60)
-    print(f"Repository: {repo_path}")
-    print(f"Mode: {args.mode}")
-    print()
-
+    # Parse known args to handle interface selection first
+    args, remaining = parser.parse_known_args()
+    
     # Check AWS credentials before proceeding
     print("Checking AWS credentials...")
     creds_available, error_message = check_aws_credentials()
@@ -61,28 +50,28 @@ Examples:
     print("✓ AWS credentials found and valid")
     print()
 
-    try:
-        # Create orchestrator with mode
-        orchestrator = WorkflowOrchestrator(mode=args.mode)
-
-        # Run in the specified mode
-        if args.mode == "conversational":
-            orchestrator.run_conversational(str(repo_path))
-        else:
-            # Auto mode - run the full workflow automatically
-            print("Starting automated migration workflow...")
-            result = orchestrator.run_workflow(str(repo_path))
-            print("Migration workflow completed!")
-            print(result)
-
-    except KeyboardInterrupt:
-        print("\nMigration cancelled by user")
-        sys.exit(0)
-    except Exception as e:
-        print(f"Exception: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    # Determine interface
+    if args.cli:
+        # Use CLI interface
+        from src.cli import run_cli
+        # Re-parse with CLI arguments
+        sys.argv = [sys.argv[0]] + remaining
+        run_cli()
+    else:
+        # Use Chat UI interface (default)
+        try:
+            from src.chat_ui import ChatApp
+            app = ChatApp()
+            app.run()
+        except ImportError as e:
+            print(f"Error: Chat UI dependencies not available: {e}")
+            print("Try installing with: uv sync")
+            print("Or use CLI mode: python main.py --cli")
+            sys.exit(1)
+        except Exception as e:
+            print(f"Chat UI Error: {e}")
+            print("Or use CLI mode: python main.py --cli")
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
