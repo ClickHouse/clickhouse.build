@@ -11,7 +11,9 @@ dependencies = [
     "notebook",
     "semver>=3.0.4",
     "pyyaml",
-    "rich>=13.0.0",
+    "click>=8.2.1",
+    "questionary>=2.1.1",
+    "rich>=14.1.0",
     "textual>=6.1.0",
 ]
 
