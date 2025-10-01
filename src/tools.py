@@ -202,7 +202,7 @@ def code_reader(repo_path: str) -> str:
         Reading findings
     """
     logger.info(f"Code reader starting analysis of repository: {repo_path}")
-    
+
     # Check AWS credentials before proceeding
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
@@ -401,7 +401,7 @@ def data_migrator(
     Returns:
         JSON configuration for setting up a ClickPipe data migration
     """
-    logger.info(f"Data migrator starting for database: {database_name}, tables: {table_names}")
+    logger.info(f"Data migrator starting for database: {database_name}, tables: {schema_tables}")
     try:
         table_mappings = []
         for schema_name, table_names in schema_tables.items():

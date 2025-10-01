@@ -9,8 +9,8 @@ import re
 from pathlib import Path
 from strands import Agent
 from strands.models import BedrockModel
-from .tools import data_migrator, ReplicationMode
-from .utils import get_callback_handler, check_aws_credentials
+from .tools import data_migrator
+from .utils import check_aws_credentials
 
 SYSTEM_PROMPT = """
 You are a data extraction specialist. Your ONLY job is to:
@@ -32,6 +32,7 @@ CRITICAL: Your response must be valid JSON in this exact format:
   "config": <the exact JSON from data_migrator tool>
 }
 
+You will likely have to make assumptions about database and schema names as well as ording keys.
 If no assumptions were made, use an empty list: "assumptions": []
 """
 
