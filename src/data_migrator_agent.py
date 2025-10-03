@@ -97,7 +97,8 @@ def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> st
         epoch = metadata.get('epoch', 'unknown')
 
         # Create the agent
-        bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
+        from .utils import create_bedrock_model
+        bedrock_model = create_bedrock_model("basic")
 
         agent = Agent(
             model=bedrock_model,

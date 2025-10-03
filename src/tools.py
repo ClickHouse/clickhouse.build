@@ -5,15 +5,34 @@ import os
 import subprocess
 import semver
 
+from typing import List, Optional
+from pydantic import BaseModel, Field, ValidationError
 from strands import Agent, tool
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from mcp import stdio_client, StdioServerParameters
-from strands_tools import shell, http_request, editor, file_write
-from .utils import get_callback_handler, CONFIG, check_aws_credentials
-from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT, DOCUMENTATION_ANALYSIS_PROMPT
+from strands_tools import shell, http_request, editor, file_write, file_read
+from .utils import get_callback_handler, CONFIG, check_aws_credentials, create_bedrock_model, get_chbuild_directory
+from .prompts import CODE_ANALYSIS_PROMPT_OPTIMISED, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT_PLANNER, DOCUMENTATION_ANALYSIS_PROMPT
 
 logger = logging.getLogger(__name__)
+
+class ConvertedQuery(BaseModel):
+    """Structured output model for a single converted query."""
+    original_file_path: str = Field(description="Path to the file containing the original query")
+    line_number: str = Field(description="Brief description of where the query appears in the file")
+    original_query: str = Field(description="The original PostgreSQL query")
+    converted_query: str = Field(description="The converted ClickHouse query")
+    conversion_notes: List[str] = Field(description="List of key changes made and performance considerations")
+    compatibility_warnings: List[str] = Field(description="Any functionality that might behave differently or require manual verification")
+
+
+class QueryConversionResult(BaseModel):
+    """Structured output model for the complete conversion result."""
+    converted_queries: List[ConvertedQuery] = Field(description="List of all converted queries")
+    summary: str = Field(description="Brief summary of the conversion process")
+    total_queries_converted: int = Field(description="Total number of queries that were converted")
+
 
 def _get_user_approval(file_path: str, content: str, original_content: str = "", change_type: str = "update", detailed_prompt: str = None) -> str:
     """
@@ -208,7 +227,7 @@ def code_reader(repo_path: str) -> str:
     if not creds_available:
         return f"Error: {error_message}"
 
-    bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
+    bedrock_model = create_bedrock_model("reader")
 
     try:
         env = {
@@ -217,31 +236,19 @@ def code_reader(repo_path: str) -> str:
             "AWS_REGION": os.getenv("AWS_REGION", "us-east-1"),
         }
 
-        git_repo_mcp_server = MCPClient(
-            lambda: stdio_client(
-                StdioServerParameters(
-                    command="uvx",
-                    args=["awslabs.git-repo-research-mcp-server@latest"],
-                    env=env,
-                )
-            )
+        code_reader_agent = Agent(
+            model=bedrock_model,
+            system_prompt=CODE_ANALYSIS_PROMPT_OPTIMISED,
+            tools=[file_read],
+            callback_handler=get_callback_handler()
         )
 
-        with git_repo_mcp_server:
-            tools = git_repo_mcp_server.list_tools_sync()
-            code_reader_agent = Agent(
-                model=bedrock_model,
-                system_prompt=CODE_ANALYSIS_PROMPT,
-                tools=tools,
-                callback_handler=get_callback_handler()
-            )
-
-            result = str(code_reader_agent(repo_path))
-            logger.info(f"=== CODE READER COMPLETED ===")
-            logger.info(f"Repository: {repo_path}")
-            logger.info(f"Result length: {len(result)} characters")
-            logger.info(f"Result preview: {result[:500]}{'...' if len(result) > 500 else ''}")
-            return result
+        result = str(code_reader_agent(repo_path))
+        logger.info(f"=== CODE READER COMPLETED ===")
+        logger.info(f"Repository: {repo_path}")
+        logger.info(f"Result length: {len(result)} characters")
+        logger.info(f"Result preview: {result[:500]}{'...' if len(result) > 500 else ''}")
+        return result
 
     except Exception as e:
         logger.error(f"Exception in code_reader: {type(e).__name__}: {e}")
@@ -264,21 +271,35 @@ def code_converter(data: str) -> str:
     if not creds_available:
         return json.dumps({"error": error_message})
 
-    bedrock_model = BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0")
+    bedrock_model = create_bedrock_model("converter")
 
     try:
         # Validate input
         if not data or not data.strip():
-            return json.dumps({"error": "No query data provided for conversion"})
+            error_result = QueryConversionResult(
+                converted_queries=[],
+                summary="No query data provided for conversion",
+                total_queries_converted=0,
+                overall_notes=["Error: No input data provided"]
+            )
+            return error_result.model_dump_json(indent=2)
 
         code_converter_agent = Agent(
             model=bedrock_model,
-            system_prompt=CODE_CONVERTER_PROMPT,
+            system_prompt=CODE_CONVERTER_PROMPT_PLANNER,
             callback_handler=get_callback_handler(),
-            tools=[get_clickhouse_documentation]
+            # tools=[get_clickhouse_documentation]
         )
 
-        result = code_converter_agent(data)
+        
+
+        # Use structured_output method to get structured response
+        result = code_converter_agent.structured_output(QueryConversionResult, data)
+
+        return result.model_dump_json(indent=2)
+
+    except ValidationError as e:
+        print(f"Validation Error: {e}")
 
         logger.info("=== CODE CONVERTER COMPLETED ===")
         logger.info(f"Input data length: {len(data)} characters")
@@ -287,26 +308,39 @@ def code_converter(data: str) -> str:
 
         # Ensure we return valid JSON
         try:
-            # Try to parse the result as JSON to validate it
-            json.loads(str(result))
-            logger.info("Code converter output is valid JSON")
-            return str(result)
-        except json.JSONDecodeError:
-            # If the result is not valid JSON, wrap it in a structured format
-            logger.warning("Code converter output was not valid JSON, wrapping in structured format")
-            return json.dumps({
-                "conversion_result": str(result),
-                "note": "Raw conversion output - may need manual JSON parsing"
-            })
+            # Make a regular call to get the raw response
+            raw_result = code_converter_agent(data)
+            raw_data = str(raw_result)
+        except Exception:
+            raw_data = "Could not retrieve raw response"
+
+        # Create a structured error response that includes the raw data for workflow continuation
+        validation_error_result = QueryConversionResult(
+            converted_queries=[],
+            summary="Validation error: The model output did not match the expected schema, but raw data is included",
+            total_queries_converted=0,
+            overall_notes=[
+                "The language model's response could not be validated against the expected schema",
+                f"Validation errors: {str(e)}",
+                "Raw response data is included below for manual processing or workflow continuation",
+                f"Raw response: {raw_data}",
+                "This might indicate the model needs clearer instructions or the schema needs adjustment"
+            ]
+        )
+        return validation_error_result.model_dump_json(indent=2)
 
     except Exception as e:
-        logger.error(f"Error in code_converter: {type(e).__name__}: {e}")
-        error_response = {
-            "error": f"Error during query conversion: {str(e)}",
-            "error_type": type(e).__name__,
-            "input_data_length": len(data) if data else 0
-        }
-        return json.dumps(error_response)
+        print(f"Error: {e}")
+        error_result = QueryConversionResult(
+            converted_queries=[],
+            summary=f"Error during query conversion: {str(e)}",
+            total_queries_converted=0,
+            overall_notes=[
+                f"Error type: {type(e).__name__}",
+                f"Input data length: {len(data) if data else 0}"
+            ]
+        )
+        return error_result.model_dump_json(indent=2)
 
 @tool
 def code_writer(repo_path: str, converted_code: str) -> str:
@@ -627,7 +661,7 @@ def browse_clickhouse_documentation(section: str = "js-client") -> str:
             doc_url = f"{CONFIG['clickhouse_urls']['base_docs']}"
 
         http_agent = Agent(
-            model=BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0"),
+            model=create_bedrock_model("basic"),
             system_prompt=DOCUMENTATION_ANALYSIS_PROMPT.format(section=section),
             callback_handler=get_callback_handler()
         )
@@ -663,10 +697,183 @@ def get_clickhouse_documentation(sections: str = "js-client,getting-started") ->
     except Exception as e:
         return f"Error fetching ClickHouse documentation: {str(e)}"
 
+@tool
+def generate_planning_report(converter_output: QueryConversionResult, repo_path: str) -> str:
+    """
+    Generate a comprehensive migration planning report using AI analysis.
+    
+    Args:
+        converter_output: The QueryConversionResult includes original prostgres queries and converted ClickHouse queries
+        repo_path: The path of the repository that is analysed
+        
+    Returns:
+        Formatted markdown planning report
+    """
+    import subprocess
+    import time
+    import uuid
+    from strands import Agent
+    
+    logger.info(f"Generating AI planning report for repository")
+    
+    try:
+        # Get git hash from the repository directory
+        try:
+            git_hash = subprocess.check_output(
+                ['git', 'rev-parse', '--short', 'HEAD'],
+                cwd=repo_path,
+                stderr=subprocess.DEVNULL
+            ).decode('ascii').strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            git_hash = "unknown"
+
+        current_epoch = int(time.time())
+        chbuild_dir = get_chbuild_directory() 
+        # Create a specialized agent for report generation
+        report_agent = Agent(
+            model=create_bedrock_model("reader"),
+            system_prompt=f"""You are a technical report generator.
+
+Your task is to get the converter_output from code conversion tool, then generate a comprehensive, well-structured migration planning report in Markdown format.
 
 
+INSTRUCTIONS:
+1. Create the planning report in folder {chbuild_dir} named as planning_report_{current_epoch}.md
+2. Extract ALL queries mentioned in the outputs (if it says "4 queries found", show all 4)
+3. For each query, extract the actual SQL code from both before and after sections
+4. Include all conversion notes and warnings mentioned
+5. Extract table schemas if any are shown
+6. Identify technologies and ORMs from the analysis
+7. Be thorough - don't miss any information from the outputs
+
+# CRITICAL RULES (HIGHEST PRIORITY):
+1. Be thorough and extract the actual SQL code from the outputs.
+2. **NEVER modify, reformat, or alter SQL queries in any way**
+3. **Do not normalize, beautify, or "fix" the SQL syntax**
+4. **Do not remove or add comments**
+5. **Do not change letter casing (keep UPPER/lower exactly as given)**
+
+## EXACT Report Structure Required (follow this structure precisely):
+
+# Migration Planning Report
+
+## Metadata
+
+- **UUID**: [Generate a unique UUID]
+- **Epoch**: [Current Unix timestamp]
+- **Repository Path**: [Extract from context]
+- **Technologies**: [Comma-separated list: Next.js, TypeScript, React, etc.]
+- **ORMs**: [Comma-separated list: Drizzle, Prisma, etc. or empty if none]
+- **Commit**: {git_hash}
+
+## Summary
+
+[Provide a concise overview of the application type and migration scope. Include query count found.]
+
+## Tables
+
+[For each table/schema found:]
+### [Table Name]
+
+**File**: [Source file path]
+
+```sql
+[Table schema definition - original query before conversion]
+```
+
+[If no tables found, write: "No table definitions found."]
+
+## Queries
+
+[For each query found:]
+### Query [N]
+
+**File**: [Source file path]
+**Type**: [Query type: analytics, select, create, etc.]
+
+[If context available:]
+**Context**: [Where the query appears]
+
+#### Before Conversion
+
+```sql
+[Original PostgreSQL query - extract the actual original_query]
+```
+
+#### After Conversion
+
+```sql
+[Converted ClickHouse query - extract the actual converted_query]
+```
+
+[If conversion notes available:]
+**Conversion Notes**:
+[List each note as bullet points]
+
+[If warnings available:]
+**Warnings**:
+[List each warning as bullet points]
+
+---
+
+## Data
+
+### Databases
+- PostgreSQL (source)
+- ClickHouse (target)
+
+### Schemas
+- Analysis based on discovered table definitions
+
+### Tables
+[List each table found in its original format, or "- No tables identified" if none]
+
+### Sorting Keys
+- To be determined based on query patterns and performance requirements
+""",
+            tools=[file_write],
+            callback_handler=get_callback_handler(),
+        )
+
+        # Prepare the analysis data
+        current_uuid = str(uuid.uuid4())
+        current_epoch = int(time.time())
+        chbuild_dir = get_chbuild_directory()
+        
+        prompt = f"""Generate a planning report based on the following converter output.
+
+CRITICAL: The output mentions finding multiple queries. Extract ALL of them with their before/after conversions.
+
+## Repository path
+{repo_path}
+
+## Code Converter Analysis Output
+{converter_output}
+
+## Report Metadata to Use
+- UUID: {current_uuid}
+- Epoch: {current_epoch}
 
 
+Save the planning report in folder {chbuild_dir} named as planning_report_{current_epoch}.md"""
 
+        # Generate the report
+        logger.info("Executing report generation agent...")
+        report = report_agent(prompt)
+        
+        logger.info("Planning report generated successfully")
+        return str(report)
+        
+    except Exception as e:
+        logger.error(f"Error generating AI planning report: {e}")
+        # Fallback to basic report
+        return f"""# Migration Planning Report (AI Generation Failed)
 
+## Error
+Failed to generate AI report: {str(e)}
 
+## Output
+```
+{converter_output[:2000]}{'...' if len(converter_output) > 2000 else ''}
+```
+"""

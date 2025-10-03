@@ -6,9 +6,10 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from strands import Agent
 from strands.models import BedrockModel
-from .tools import code_reader, code_converter, code_writer, data_migrator, ensure_clickhouse_client
-from .utils import get_callback_handler, check_aws_credentials
+from .tools import code_reader, code_converter, code_writer, data_migrator, ensure_clickhouse_client, generate_planning_report
+from .utils import get_callback_handler, check_aws_credentials, create_bedrock_model
 from .logging_config import get_logger, setup_logging, LogLevel
+from .prompts import ORCHESTRATOR_PLANNING_MODE_OPTIMISED
 
 class WorkflowOrchestrator:
     def __init__(self, mode: str = "interactive", callback_handler=None, tui_mode: bool = False, app_instance=None, planning_mode: bool = False):
@@ -29,6 +30,8 @@ class WorkflowOrchestrator:
         self._modified_files = []
         self._warnings = []
         self._errors = []
+        # Track metrics from all agent executions
+        self._agent_metrics = []
 
         # Ensure logging is properly configured
         self._setup_logging()
@@ -49,20 +52,6 @@ class WorkflowOrchestrator:
         The coordinator can re-try and validate accordingly.
         The coordinator understands the output of each agent and provides the output if needed as input to the next agent.
         """
-
-        # Planning mode system prompt
-        self.planning_system_prompt = """You are an intelligent workflow orchestrator with access to specialist agents.
-
-Your role is to coordinate a PLANNING workflow using these specialist agents:
-- code_reader: Reads a repository content and searches for all postgres analytics queries and table creation scripts
-- code_converter: Converts the found postgres analytics queries to ClickHouse analytics queries
-
-YOU ARE RUNNING IN PLANNING MODE. Do not make any changes to files or configurations.
-Your goal is to analyze the repository and generate conversion plans.
-
-The agents should run sequentially: code_reader -> code_converter.
-After both agents complete, provide a comprehensive analysis report.
-"""
 
         # Use default callback handler if none provided
         if callback_handler is None:
@@ -243,18 +232,7 @@ After both agents complete, provide a comprehensive analysis report.
             return "Workflow cancelled before execution"
 
         try:
-            claude4_model = BedrockModel(
-                model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
-                max_tokens=4096,
-                temperature=1,
-                additional_request_fields={
-                    "anthropic_beta": ["interleaved-thinking-2025-05-14"],
-                    "reasoning_config": {
-                        "type": "enabled",
-                        "budget_tokens": 3000
-                    }
-                }
-            )
+            claude4_model = create_bedrock_model("default")
 
             # Import tools
             from .tools import ensure_clickhouse_client, code_reader, code_converter, code_writer, data_migrator
@@ -285,9 +263,9 @@ After both agents complete, provide a comprehensive analysis report.
         """
 
         try:
-            # Check for cancellation before execution
-            if self.cancelled:
-                return "Workflow cancelled before orchestrator execution"
+            # # Check for cancellation before execution
+            # if self.cancelled:
+            #     return "Workflow cancelled before orchestrator execution"
 
             # Store repo path for results
             self._current_repo_path = repo_path
@@ -296,11 +274,27 @@ After both agents complete, provide a comprehensive analysis report.
             # Execute orchestrator (this is the long-running part)
             self.logger.info("Executing Strands orchestrator synchronously")
             result = orchestrator(prompt)
-
-            # Check for cancellation after execution
-            if self.cancelled:
-                self.logger.warning("Workflow cancelled during execution")
-                return "Workflow cancelled during execution"
+            
+            from parse_event_metrics import parse_and_print_event_metrics
+            self.logger.info("📊 Detailed Workflow Metrics Analysis:")
+            parse_and_print_event_metrics(result.metrics)
+            
+            # Generate comprehensive metrics report
+            try:
+                from generate_metrics_report import generate_comprehensive_metrics_report
+                report_path = generate_comprehensive_metrics_report(
+                    result.metrics, 
+                    "MAIN_WORKFLOW", 
+                    repo_path
+                )
+                self.logger.info(f"📋 Comprehensive metrics report: {report_path}")
+            except ImportError:
+                self.logger.info("📋 Using basic metrics report format")
+                                        
+            # # Check for cancellation after execution
+            # if self.cancelled:
+            #     self.logger.warning("Workflow cancelled during execution")
+            #     return "Workflow cancelled during execution"
 
             # Process results
             end_time = datetime.now()
@@ -323,85 +317,120 @@ After both agents complete, provide a comprehensive analysis report.
         start_time = datetime.now()
         self.logger.info(f"🚀 Starting planning workflow for: {repo_path}")
         self.logger.info("📋 Planning Mode: Analysis only - no file modifications will be made")
-        
-        code_reader_output = ""
-        code_converter_output = ""
-        
+        output = ""
         try:
             # Ensure output directory exists
             self._ensure_planning_output_directory(repo_path)
-            
+            from strands.tools.executors import ConcurrentToolExecutor
+
             # Create agent with planning-specific system prompt and limited tools
-            planning_tools = [code_reader, code_converter]
-            claude4_model = BedrockModel(
-                model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
-                max_tokens=4096,
-                temperature=1,
-                additional_request_fields={
-                    "anthropic_beta": ["interleaved-thinking-2025-05-14"],
-                    "reasoning_config": {
-                        "type": "enabled",
-                        "budget_tokens": 3000
-                    }
-                }
-            )
+            planning_tools = [code_reader, code_converter, generate_planning_report]
+            claude4_model = create_bedrock_model("planning")
             agent = Agent(
+                tool_executor=ConcurrentToolExecutor(),
                 model=claude4_model,
                 tools=planning_tools,
-                system_prompt=self.planning_system_prompt,
+                system_prompt=ORCHESTRATOR_PLANNING_MODE_OPTIMISED,
                 callback_handler=self.custom_callback_handler,
             )
 
             # Execute planning workflow
-            self.logger.info("🔍 Step 1/3: Executing code reader analysis...")
+            # self.logger.info("🔍 Step 1/3: Executing code reader analysis...")
             try:
-                prompt = f"PLANNING MODE: Analyze the repository at {repo_path} using ONLY code_reader and code_converter tools. Find PostgreSQL queries and convert them to ClickHouse format. DO NOT use ensure_clickhouse_client, code_writer, or data_migrator tools. This is analysis only - make no file changes."
+                prompt = f"""Coordinate the plan generation for the following local repository: {repo_path}
+
+        Instructions:
+        1. Think carefully about what information you need to accomplish this task
+        2. Use the specialist agents strategically - each has unique strengths
+        3. After each tool use, reflect on the results and adapt your approach
+        4. Ensure accuracy by fact-checking when appropriate
+
+        Remember: Your thinking between tool calls helps you make better decisions.
+        Use it to plan, evaluate results, and adjust your strategy."""
                 result = agent(prompt)
+                print(result)
                 
-                if self.cancelled:
-                    self.logger.warning("Planning workflow cancelled during execution")
-                    return "Planning workflow cancelled during execution"
+                print(result.metrics.get_summary())
+                
+                # Simple metrics collection and detailed analysis
+                if hasattr(result, 'metrics') and result.metrics:
+                    try:
+                        metrics_summary = result.metrics.get_summary()
+                        
+                        # Print detailed metrics analysis
+                        from parse_event_metrics import parse_and_print_event_metrics
+                        self.logger.info("📊 Detailed Planning Workflow Metrics Analysis:")
+                        parse_and_print_event_metrics(result.metrics)
+                        
+                        # Generate comprehensive metrics report
+                        try:
+                            from generate_metrics_report import generate_comprehensive_metrics_report
+                            report_path = generate_comprehensive_metrics_report(
+                                result.metrics, 
+                                "PLANNING_WORKFLOW", 
+                                repo_path
+                            )
+                            self.logger.info(f"📋 Comprehensive planning metrics report: {report_path}")
+                        except ImportError:
+                            self.logger.info("📋 Using basic metrics report format")
+                        
+                        # Save detailed metrics to file
+                        self._save_metrics_to_file("PLANNING_WORKFLOW", metrics_summary, repo_path, result.metrics)
+                        
+                    except ImportError:
+                        self.logger.warning("Metrics parser not available - install parse_event_metrics.py")
+                        # Still save basic metrics
+                        metrics_summary = result.metrics.get_summary() if hasattr(result.metrics, 'get_summary') else str(result.metrics)
+                        self._save_metrics_to_file("PLANNING_WORKFLOW", metrics_summary, repo_path, result.metrics)
+                    except Exception as e:
+                        self.logger.error(f"Error processing planning metrics: {e}")
+                        # Fallback to basic metrics
+                        metrics_summary = str(result.metrics) if result.metrics else "No metrics available"
+                        self._save_metrics_to_file("PLANNING_WORKFLOW", metrics_summary, repo_path, result.metrics)
+                
+                # if self.cancelled:
+                #     self.logger.warning("Planning workflow cancelled during execution")
+                #     return "Planning workflow cancelled during execution"
                 
                 # Extract tool outputs from agent execution
                 result_str = str(result)
-                code_reader_output = result_str
-                code_converter_output = result_str
+                output = result_str
                 
-                self.logger.info("✅ Step 1/3: Code analysis completed")
+                # self.logger.info("✅ Step 1/3: Code analysis completed")
                 
             except Exception as e:
                 self.logger.error(f"❌ Planning workflow execution failed: {e}")
                 raise
 
-            # Generate planning report using AI
-            self.logger.info("📊 Step 2/3: Generating planning report with AI...")
-            try:
-                planning_report = self._generate_ai_planning_report(repo_path, code_reader_output, code_converter_output)
-                self.logger.info("✅ Step 2/3: AI planning report generated")
+            # # Generate planning report using AI
+            # self.logger.info("📊 Step 2/3: Generating planning report with AI...")
+            # try:
+            #     planning_report = generate_planning_report(result_str)
+            #     self.logger.info("✅ Step 2/3: AI planning report generated")
                 
-            except Exception as e:
-                self.logger.error(f"❌ AI planning report generation failed: {e}")
-                # Continue with a basic report
-                planning_report = f"# Planning Report Generation Error\n\nFailed to generate detailed report: {str(e)}\n\n## Raw Analysis Output\n\n{result_str}"
+            # except Exception as e:
+            #     self.logger.error(f"❌ AI planning report generation failed: {e}")
+            #     # Continue with a basic report
+            #     planning_report = f"# Planning Report Generation Error\n\nFailed to generate detailed report: {str(e)}\n\n## Raw Analysis Output\n\n{result_str}"
             
             # Save planning report
-            self.logger.info("💾 Step 3/3: Saving planning results...")
-            try:
-                report_path = self._save_planning_report(repo_path, planning_report)
-                self.logger.info(f"✅ Step 3/3: Planning results saved to {report_path}")
+            # self.logger.info("💾 Step 3/3: Saving planning results...")
+            # try:
+            #     report_path = self._save_planning_report(repo_path, planning_report)
+            #     self.logger.info(f"✅ Step 3/3: Planning results saved to {report_path}")
                 
-            except Exception as e:
-                self.logger.error(f"❌ Failed to save planning report: {e}")
-                # Still return the report content even if saving failed
+            # except Exception as e:
+            #     self.logger.error(f"❌ Failed to save planning report: {e}")
+            #     # Still return the report content even if saving failed
             
             # Log planning results summary
-            self._log_planning_summary(repo_path, code_reader_output, code_converter_output)
+            # self._log_planning_summary(repo_path, output)
             
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
             self.logger.info(f"🎉 Planning workflow completed successfully in {duration:.2f} seconds")
             
-            return planning_report
+            # return planning_report
 
         except Exception as e:
             self.logger.error(f"❌ Planning workflow failed: {e}")
@@ -419,12 +448,11 @@ After both agents complete, provide a comprehensive analysis report.
 - **Timestamp**: {datetime.now().isoformat()}
 
 ## Partial Results
-- **Code Reader Output**: {"Available" if code_reader_output else "Not available"}
-- **Code Converter Output**: {"Available" if code_converter_output else "Not available"}
+- **Output**: {"Available" if output else "Not available"}
 
 ## Raw Output
 ```
-{code_reader_output if code_reader_output else "No output captured"}
+{output if output else "No output captured"}
 ```
 """
             
@@ -450,188 +478,27 @@ After both agents complete, provide a comprehensive analysis report.
             self.logger.error(f"Failed to create planning output directory: {e}")
             raise
 
-    def _log_planning_summary(self, repo_path: str, code_reader_output: str, code_converter_output: str) -> None:
+    def _log_planning_summary(self, repo_path: str, output: str) -> None:
         """Log planning results summary."""
         try:
             # Count queries found
             query_indicators = ['SELECT', 'INSERT', 'UPDATE', 'DELETE']
-            query_count = sum(code_reader_output.upper().count(indicator) for indicator in query_indicators)
+            query_count = sum(output.upper().count(indicator) for indicator in query_indicators)
             
             # Count files analyzed
-            file_count = code_reader_output.count('File:') if 'File:' in code_reader_output else 0
+            file_count = output.count('File:') if 'File:' in output else 0
             
             # Log summary
             self.logger.info("📊 Planning Results Summary:")
             self.logger.info(f"   📁 Repository: {repo_path}")
             self.logger.info(f"   📄 Files analyzed: {file_count}")
             self.logger.info(f"   🔍 Queries found: {query_count}")
-            self.logger.info(f"   📝 Code reader output: {len(code_reader_output)} characters")
-            self.logger.info(f"   🔄 Code converter output: {len(code_converter_output)} characters")
+            self.logger.info(f"   📝 Output: {len(output)} characters")
             
         except Exception as e:
             self.logger.error(f"Failed to log planning summary: {e}")
 
-    def _generate_ai_planning_report(self, repo_path: str, code_reader_output: str, code_converter_output: str) -> str:
-        """Generate planning report using AI to analyze the raw outputs."""
-        try:
-            # Get git hash from the repository directory
-            try:
-                git_hash = subprocess.check_output(
-                    ['git', 'rev-parse', '--short', 'HEAD'],
-                    cwd=repo_path,
-                    stderr=subprocess.DEVNULL
-                ).decode('ascii').strip()
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                git_hash = "unknown"
-            # Create a specialized agent for report generation
-            report_agent = Agent(
-                model=BedrockModel(model_id="us.anthropic.claude-sonnet-4-20250514-v1:0"),
-                system_prompt=f"""You are a technical report generator specializing in PostgreSQL to ClickHouse migration planning reports.
 
-Your task is to analyze the outputs from code analysis and query conversion tools, then generate a comprehensive, well-structured migration planning report in Markdown format.
-
-## EXACT Report Structure Required (follow this structure precisely):
-
-# Migration Planning Report
-
-## Metadata
-
-- **UUID**: [Generate a unique UUID]
-- **Epoch**: [Current Unix timestamp]
-- **Repository Path**: [Extract from context]
-- **Technologies**: [Comma-separated list: Next.js, TypeScript, React, etc.]
-- **ORMs**: [Comma-separated list: Drizzle, Prisma, etc. or empty if none]
-- **Commit**: {git_hash}
-
-## Summary
-
-[Provide a concise overview of the application type and migration scope. Include query count found.]
-
-## Tables
-
-[For each table/schema found:]
-### [Table Name]
-
-**File**: [Source file path]
-
-```typescript
-[Table schema definition]
-```
-
-[If no tables found, write: "No table definitions found."]
-
-## Queries
-
-[For each query found:]
-### Query [N]
-
-**File**: [Source file path]
-**Type**: [Query type: analytics, select, etc.]
-
-[If context available:]
-**Context**: [Where the query appears]
-
-#### Before Conversion
-
-```sql
-[Original PostgreSQL query - extract the actual SQL]
-```
-
-#### After Conversion
-
-```sql
-[Converted ClickHouse query - extract the actual SQL]
-```
-
-[If conversion notes available:]
-**Conversion Notes**:
-[List each note as bullet points]
-
-[If warnings available:]
-**Warnings**:
-[List each warning as bullet points with ⚠️ emoji]
-
----
-
-## Data
-
-### Databases
-- PostgreSQL (source)
-- ClickHouse (target)
-
-### Schemas
-- Analysis based on discovered table definitions
-
-### Tables
-[List each table found, or "- No tables identified" if none]
-
-### Sorting Keys
-- To be determined based on query patterns and performance requirements
-
-IMPORTANT: Extract ALL queries mentioned in the analysis. If the analysis mentions "4 queries found" then show all 4 queries with their before/after conversions. Be thorough and extract the actual SQL code from the outputs.""",
-                callback_handler=self.custom_callback_handler,
-            )
-
-            # Prepare the analysis data
-            import time
-            import uuid
-            
-            current_uuid = str(uuid.uuid4())
-            current_epoch = int(time.time())
-            
-            prompt = f"""Generate a comprehensive migration planning report based on the following analysis outputs.
-
-CRITICAL: The analysis mentions finding multiple queries. Extract ALL of them with their before/after conversions.
-
-## Repository Path
-{repo_path}
-
-## Code Reader Analysis Output
-{code_reader_output}
-
-## Code Converter Analysis Output  
-{code_converter_output}
-
-## Report Metadata to Use
-- UUID: {current_uuid}
-- Epoch: {current_epoch}
-
-INSTRUCTIONS:
-1. Follow the EXACT structure provided in your system prompt
-2. Extract ALL queries mentioned in the outputs (if it says "4 queries found", show all 4)
-3. For each query, extract the actual SQL code from both before and after sections
-4. Include all conversion notes and warnings mentioned
-5. Extract table schemas if any are shown
-6. Identify technologies and ORMs from the analysis
-7. Be thorough - don't miss any information from the outputs
-
-Generate the complete migration planning report now."""
-
-            # Generate the report
-            report = report_agent(prompt)
-            return str(report)
-            
-        except Exception as e:
-            self.logger.error(f"Error generating AI planning report: {e}")
-            # Fallback to basic report
-            return f"""# Migration Planning Report (AI Generation Failed)
-
-## Error
-Failed to generate AI report: {str(e)}
-
-## Repository
-{repo_path}
-
-## Code Reader Output
-```
-{code_reader_output[:2000]}{'...' if len(code_reader_output) > 2000 else ''}
-```
-
-## Code Converter Output  
-```
-{code_converter_output[:2000]}{'...' if len(code_converter_output) > 2000 else ''}
-```
-"""
 
     def _save_planning_report(self, repo_path: str, report_content: str, is_error: bool = False) -> str:
         """Save planning report to file."""
@@ -676,18 +543,7 @@ Failed to generate AI report: {str(e)}
             self.logger.info("Setting up orchestrator for async streaming")
             yield {"type": "setup_start", "message": "Setting up orchestrator"}
 
-            claude4_model = BedrockModel(
-                model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
-                max_tokens=4096,
-                temperature=1,
-                additional_request_fields={
-                    "anthropic_beta": ["interleaved-thinking-2025-05-14"],
-                    "reasoning_config": {
-                        "type": "enabled",
-                        "budget_tokens": 3000
-                    }
-                }
-            )
+            claude4_model = create_bedrock_model("default")
 
             # Import tools
             from .tools import ensure_clickhouse_client, code_reader, code_converter, code_writer, data_migrator
@@ -854,18 +710,7 @@ Failed to generate AI report: {str(e)}
     def run_conversational(self, initial_repo_path: str = ""):
         """Run in interactive mode allowing back-and-forth with orchestrator."""
 
-        claude4_model = BedrockModel(
-            model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
-            max_tokens=4096,
-            temperature=1,
-            additional_request_fields={
-                "anthropic_beta": ["interleaved-thinking-2025-05-14"],
-                "reasoning_config": {
-                    "type": "enabled",
-                    "budget_tokens": 3000
-                }
-            }
-        )
+        claude4_model = create_bedrock_model("default")
 
         orchestrator = Agent(
             model=claude4_model,
@@ -910,3 +755,137 @@ Failed to generate AI report: {str(e)}
             except Exception as e:
                 print(f"Error: {e}")
                 message = "There was an error. Please try again."
+
+    def _save_metrics_to_file(self, workflow_name: str, metrics_summary: str, repo_path: str, metrics_obj=None) -> None:
+        """Save metrics summary to timestamped files with detailed analysis."""
+        try:
+            from pathlib import Path
+            from .utils import get_chbuild_directory
+            import io
+            import sys
+            
+            # Create metrics directory in the configured chbuild directory
+            chbuild_dir = get_chbuild_directory()
+            metrics_dir = Path(chbuild_dir) / "metrics_reports"
+            metrics_dir.mkdir(exist_ok=True)
+            
+            # Filter out input_params from metrics if it's a dict
+            if isinstance(metrics_summary, dict):
+                filtered_metrics = {k: v for k, v in metrics_summary.items() if k != 'input_params'}
+            else:
+                filtered_metrics = metrics_summary
+            
+            # Extract key metrics if metrics object is provided
+            key_metrics = ""
+            detailed_analysis = ""
+            
+            if metrics_obj:
+                try:
+                    # Basic key metrics
+                    total_tokens = metrics_obj.accumulated_usage.get('totalTokens', 'N/A')
+                    execution_time = sum(metrics_obj.cycle_durations) if metrics_obj.cycle_durations else 0
+                    tools_used = list(metrics_obj.tool_metrics.keys()) if metrics_obj.tool_metrics else []
+                    
+                    key_metrics = f"""
+KEY METRICS SUMMARY:
+- Total tokens: {total_tokens}
+- Execution time: {execution_time:.2f} seconds
+- Tools used: {tools_used}
+- Cycles: {metrics_obj.cycle_count}
+
+"""
+                    
+                    # Generate detailed analysis using our parser
+                    try:
+                        from parse_event_metrics import (
+                            print_execution_overview, 
+                            print_token_usage, 
+                            print_tool_usage, 
+                            print_execution_traces, 
+                            print_performance_metrics
+                        )
+                        
+                        # Capture the detailed analysis output
+                        old_stdout = sys.stdout
+                        sys.stdout = captured_output = io.StringIO()
+                        
+                        # Get summary for detailed analysis
+                        summary = metrics_obj.get_summary()
+                        
+                        print("🔍 DETAILED EVENTLOOP METRICS ANALYSIS")
+                        print("=" * 60)
+                        
+                        print_execution_overview(summary)
+                        print_token_usage(summary)
+                        print_tool_usage(summary)
+                        print_execution_traces(summary)
+                        print_performance_metrics(summary)
+                        
+                        # Restore stdout and get the captured output
+                        sys.stdout = old_stdout
+                        detailed_analysis = captured_output.getvalue()
+                        
+                    except ImportError:
+                        detailed_analysis = "Detailed metrics parser not available. Install parse_event_metrics.py for enhanced analysis.\n\n"
+                    except Exception as e:
+                        detailed_analysis = f"Error generating detailed analysis: {e}\n\n"
+                        
+                except Exception as e:
+                    key_metrics = f"Error extracting key metrics: {e}\n\n"
+            
+            # Create timestamped filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            workflow_name_clean = workflow_name.lower().replace(" ", "_")
+            metrics_file = metrics_dir / f"metrics_{workflow_name_clean}_{timestamp}.txt"
+            
+            # Write comprehensive metrics to timestamped file
+            with open(metrics_file, 'w', encoding='utf-8') as f:
+                f.write(f"=== AGENT METRICS REPORT ({workflow_name}) ===\n")
+                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                f.write(f"Repository: {repo_path}\n")
+                f.write(f"CHBuild Directory: {chbuild_dir}\n")
+                f.write("=" * 60 + "\n\n")
+                
+                # Write key metrics summary
+                f.write(key_metrics)
+                
+                # Write detailed analysis if available
+                if detailed_analysis:
+                    f.write(detailed_analysis)
+                    f.write("\n\n")
+                
+                # Write raw metrics data
+                f.write("📄 RAW METRICS DATA:\n")
+                f.write("-" * 30 + "\n")
+                f.write(str(filtered_metrics))
+                f.write("\n\n" + "=" * 60 + "\n")
+            
+            # Also append to the main metrics file for backward compatibility
+            main_metrics_file = metrics_dir / "agent_metrics.txt"
+            with open(main_metrics_file, 'a', encoding='utf-8') as f:
+                f.write(f"=== AGENT METRICS REPORT ({workflow_name}) ===\n")
+                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                f.write(f"Repository: {repo_path}\n")
+                f.write("=" * 60 + "\n\n")
+                
+                # Write key metrics summary
+                f.write(key_metrics)
+                
+                # Write detailed analysis if available
+                if detailed_analysis:
+                    f.write(detailed_analysis)
+                    f.write("\n\n")
+                
+                # Write raw metrics data
+                f.write("📄 RAW METRICS DATA:\n")
+                f.write("-" * 30 + "\n")
+                f.write(str(filtered_metrics))
+                f.write("\n\n" + "=" * 60 + "\n\n")
+            
+            self.logger.info(f"📊 Metrics saved to: {metrics_file}")
+            self.logger.info(f"📊 Metrics also appended to: {main_metrics_file}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save metrics: {e}")
+
+

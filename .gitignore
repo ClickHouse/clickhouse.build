@@ -16,3 +16,5 @@ logs/
 test/pg-expense-direct/planning_results/
 test/pg-expense-drizzleorm/planning_results/
 test/pg-expense-prisma/planning_results/
+__pycache__/
+

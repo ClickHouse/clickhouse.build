@@ -81,3 +81,85 @@ def get_chbuild_directory():
     except:
         # Fallback to current directory if config is not available
         return '.'
+
+
+def get_model_config(model_type: str = "default"):
+    """
+    Get model configuration from config.yaml.
+    
+    Args:
+        model_type: Type of model config to get (default, planning, basic)
+        
+    Returns:
+        dict: Model configuration parameters
+    """
+    try:
+        models_config = CONFIG.get('models', {})
+        model_config = models_config.get(model_type, models_config.get('default', {}))
+        
+        # Fallback configuration if nothing is found in config
+        if not model_config:
+            return {
+                'model_id': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
+                'max_tokens': 8192,
+                'temperature': 1,
+                'additional_request_fields': {
+                    'anthropic_beta': ['interleaved-thinking-2025-05-14'],
+                    'reasoning_config': {
+                        'type': 'enabled',
+                        'budget_tokens': 3000
+                    }
+                }
+            }
+        
+        return model_config
+    except:
+        # Fallback configuration if config loading fails
+        return {
+            'model_id': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
+            'max_tokens': 8192,
+            'temperature': 1,
+            'additional_request_fields': {
+                'anthropic_beta': ['interleaved-thinking-2025-05-14'],
+                'reasoning_config': {
+                    'type': 'enabled',
+                    'budget_tokens': 3000
+                }
+            }
+        }
+
+
+def create_bedrock_model(model_type: str = "default"):
+    """
+    Create a BedrockModel instance using configuration from config.yaml.
+    
+    Args:
+        model_type: Type of model config to use (default, planning, basic)
+        
+    Returns:
+        BedrockModel: Configured model instance
+    """
+    from strands.models import BedrockModel
+    import boto3
+    from botocore.config import Config
+    
+    # Get timeout settings from config with generous defaults
+    settings = CONFIG.get('settings', {})
+    connect_timeout = settings.get('connect_timeout', 120)
+    read_timeout = settings.get('read_timeout', 300)
+    max_retries = settings.get('max_retries', 3)
+        # Create boto3 config with generous timeouts
+    boto_client_config = Config(
+        region_name=os.getenv('AWS_REGION', 'us-east-1'),
+        retries={
+            'max_attempts': max_retries,
+            'mode': 'adaptive'
+        },
+        read_timeout=read_timeout,
+        connect_timeout=connect_timeout,
+        max_pool_connections=50
+    )
+    config = get_model_config(model_type)
+    config['boto_client_config'] = boto_client_config
+
+    return BedrockModel(**config)
