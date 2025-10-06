@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 from dataclasses import dataclass
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.agents.planner import agent_planner
 from src.utils import check_aws_credentials
@@ -235,7 +235,7 @@ def main():
     with open(ground_truth_path, 'r') as f:
         ground_truth = json.load(f)
 
-    base_path = eval_dir.parent
+    base_path = eval_dir.parent.parent
 
     # Run evaluations
     results = []

@@ -1,5 +1,4 @@
 import logging
-import os
 import time
 import json
 from typing import List
@@ -50,7 +49,8 @@ You will return structured JSON with:
   - location: File path with line numbers (e.g., /app/api/route.ts:L60-65)
 """
 
-model_id="anthropic.claude-3-5-haiku-20241022-v1:0"
+# model_id="anthropic.claude-3-5-haiku-20241022-v1:0"
+model_id="us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 class AnalyticalQuery(BaseModel):
     """Represents a single analytical SQL query found in the codebase"""
@@ -67,7 +67,7 @@ class QueryAnalysisResult(BaseModel):
 
 @tool
 def agent_planner(repo_path: str) -> str:
-    logger.info(f"agent_planner starting analysis of repository: {repo_path}")
+    logger.info(f"planner starting analysis of repository: {repo_path}")
 
     creds_available, error_message = check_aws_credentials()
     if not creds_available:

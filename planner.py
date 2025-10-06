@@ -24,8 +24,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def main():
-    """Run the code planner on the test/pg-expense-direct project."""
-
     # Check AWS credentials
     print("Checking AWS credentials...")
     creds_available, error_message = check_aws_credentials()
@@ -35,7 +33,7 @@ def main():
     print("✓ AWS credentials found and valid\n")
 
     # Define the repository path
-    repo_path = os.path.join(os.path.dirname(__file__), "test", "pg-expense-prisma")
+    repo_path = os.path.join(os.path.dirname(__file__), "test", "cal.com")
 
     # Verify the path exists
     if not os.path.exists(repo_path):
