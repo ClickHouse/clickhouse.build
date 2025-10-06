@@ -1,0 +1,258 @@
+{
+  "summary": {
+    "total_tests": 3,
+    "passed": 2,
+    "failed": 1,
+    "errors": 0,
+    "skipped": 0,
+    "pass_rate": 0.6666666666666666
+  },
+  "results": [
+    {
+      "name": "pg-expense-direct",
+      "status": "PASS",
+      "metrics": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0
+      },
+      "counts": {
+        "expected_tables": 1,
+        "actual_tables": 1,
+        "expected_queries": 4,
+        "actual_queries": 4,
+        "table_count_correct": true,
+        "query_count_correct": true
+      },
+      "expected": {
+        "total_tables": 1,
+        "total_queries": 4,
+        "tables": [
+          "expenses"
+        ],
+        "queries": [
+          {
+            "description": "Total expenses aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L27-30",
+            "has_aggregation": true,
+            "query_type": "raw_sql"
+          },
+          {
+            "description": "Expenses by category",
+            "location": "/app/api/expenses/stats/route.ts:L33-42",
+            "has_aggregation": true,
+            "query_type": "raw_sql"
+          },
+          {
+            "description": "Monthly expenses aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L45-54",
+            "has_aggregation": true,
+            "query_type": "raw_sql"
+          },
+          {
+            "description": "Daily expenses aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L57-67",
+            "has_aggregation": true,
+            "query_type": "raw_sql"
+          }
+        ]
+      },
+      "actual": {
+        "tables": [
+          "expenses"
+        ],
+        "total_tables": 1,
+        "total_queries": 4,
+        "queries": [
+          {
+            "description": "Total expenses count and sum with optional date filtering",
+            "code": "SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM expenses ${whereClause}",
+            "location": "/app/api/expenses/stats/route.ts:L28"
+          },
+          {
+            "description": "Expenses grouped by category with count and total amount",
+            "code": "SELECT COALESCE(category, 'Uncategorized') as category, COUNT(*) as count, SUM(amount) as total FROM expenses ${whereClause} GROUP BY category ORDER BY total DESC",
+            "location": "/app/api/expenses/stats/route.ts:L34-L41"
+          },
+          {
+            "description": "Monthly expense aggregation with count and total amount",
+            "code": "SELECT DATE_TRUNC('month', date) as month, COUNT(*) as count, SUM(amount) as total FROM expenses ${whereClause} GROUP BY DATE_TRUNC('month', date) ORDER BY month DESC",
+            "location": "/app/api/expenses/stats/route.ts:L46-L52"
+          },
+          {
+            "description": "Daily expense aggregation for the last 30 days",
+            "code": "SELECT date, COUNT(*) as count, SUM(amount) as total FROM expenses ${whereClause} GROUP BY date ORDER BY date DESC LIMIT 30",
+            "location": "/app/api/expenses/stats/route.ts:L58-L65"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pg-expense-drizzleorm",
+      "status": "PASS",
+      "metrics": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0
+      },
+      "counts": {
+        "expected_tables": 1,
+        "actual_tables": 1,
+        "expected_queries": 4,
+        "actual_queries": 4,
+        "table_count_correct": true,
+        "query_count_correct": true
+      },
+      "expected": {
+        "total_tables": 1,
+        "total_queries": 4,
+        "tables": [
+          "expenses"
+        ],
+        "queries": [
+          {
+            "description": "Total expenses count and sum",
+            "location": "/app/api/expenses/stats/route.ts:L27-30",
+            "has_aggregation": true,
+            "query_type": "orm"
+          },
+          {
+            "description": "Expenses by category",
+            "location": "/app/api/expenses/stats/route.ts:L35-41",
+            "has_aggregation": true,
+            "query_type": "orm"
+          },
+          {
+            "description": "Monthly expenses",
+            "location": "/app/api/expenses/stats/route.ts:L45-52",
+            "has_aggregation": true,
+            "query_type": "orm"
+          },
+          {
+            "description": "Daily expenses",
+            "location": "/app/api/expenses/stats/route.ts:L57-62",
+            "has_aggregation": true,
+            "query_type": "orm"
+          }
+        ]
+      },
+      "actual": {
+        "tables": [
+          "expenses"
+        ],
+        "total_tables": 1,
+        "total_queries": 4,
+        "queries": [
+          {
+            "description": "Total expenses count and sum",
+            "code": "db.select({ count: count(), total: sum(expenses.amount) }).from(expenses).where(whereCondition)",
+            "location": "/app/api/expenses/stats/route.ts:L25-30"
+          },
+          {
+            "description": "Expenses aggregated by category",
+            "code": "db.select({ category: sql`COALESCE(${expenses.category}, 'Uncategorized')`, count: count(), total: sum(expenses.amount) }).from(expenses).where(whereCondition).groupBy(sql`COALESCE(${expenses.category}, 'Uncategorized')`).orderBy(desc(sum(expenses.amount)))",
+            "location": "/app/api/expenses/stats/route.ts:L33-41"
+          },
+          {
+            "description": "Monthly expense aggregation",
+            "code": "db.select({ month: sql`DATE_TRUNC('month', ${expenses.date})`, count: count(), total: sum(expenses.amount) }).from(expenses).where(whereCondition).groupBy(sql`DATE_TRUNC('month', ${expenses.date})`).orderBy(desc(sql`DATE_TRUNC('month', ${expenses.date}`))",
+            "location": "/app/api/expenses/stats/route.ts:L44-52"
+          },
+          {
+            "description": "Daily expense aggregation for last 30 days",
+            "code": "db.select({ date: expenses.date, count: count(), total: sum(expenses.amount) }).from(expenses).where(whereCondition).groupBy(expenses.date).orderBy(desc(expenses.date)).limit(30)",
+            "location": "/app/api/expenses/stats/route.ts:L55-64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pg-expense-prisma",
+      "status": "FAIL",
+      "metrics": {
+        "precision": 0.5,
+        "recall": 0.5,
+        "f1_score": 0.5,
+        "true_positives": 2,
+        "false_positives": 2,
+        "false_negatives": 2
+      },
+      "counts": {
+        "expected_tables": 1,
+        "actual_tables": 1,
+        "expected_queries": 4,
+        "actual_queries": 4,
+        "table_count_correct": true,
+        "query_count_correct": true
+      },
+      "expected": {
+        "total_tables": 1,
+        "total_queries": 4,
+        "tables": [
+          "expenses"
+        ],
+        "queries": [
+          {
+            "description": "Total expenses aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L27-32",
+            "has_aggregation": true,
+            "query_type": "orm"
+          },
+          {
+            "description": "Category aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L36-46",
+            "has_aggregation": true,
+            "query_type": "orm"
+          },
+          {
+            "description": "Monthly aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L50-60",
+            "has_aggregation": true,
+            "query_type": "orm"
+          },
+          {
+            "description": "Daily aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L64-74",
+            "has_aggregation": true,
+            "query_type": "orm"
+          }
+        ]
+      },
+      "actual": {
+        "tables": [
+          "expenses"
+        ],
+        "total_tables": 1,
+        "total_queries": 4,
+        "queries": [
+          {
+            "description": "Total expenses aggregation with count and sum",
+            "code": "await prisma.expense.aggregate({\n  where,\n  _count: { id: true },\n  _sum: { amount: true }\n})",
+            "location": "/app/api/expenses/stats/route.ts:L21-25"
+          },
+          {
+            "description": "Expenses grouped by category with count and sum",
+            "code": "await prisma.expense.groupBy({\n  by: ['category'],\n  where,\n  _count: { id: true },\n  _sum: { amount: true },\n  orderBy: { _sum: { amount: 'desc' } }\n})",
+            "location": "/app/api/expenses/stats/route.ts:L28-34"
+          },
+          {
+            "description": "Monthly expense aggregation using raw SQL with DATE_TRUNC",
+            "code": "SELECT\n  DATE_TRUNC('month', date) as month,\n  COUNT(*) as count,\n  SUM(amount) as total\nFROM expenses\nWHERE 1=1\nGROUP BY DATE_TRUNC('month', date)\nORDER BY month DESC",
+            "location": "/app/api/expenses/stats/route.ts:L37-60"
+          },
+          {
+            "description": "Daily expense aggregation with count and sum",
+            "code": "await prisma.expense.groupBy({\n  by: ['date'],\n  where,\n  _count: { id: true },\n  _sum: { amount: true },\n  orderBy: { date: 'desc' },\n  take: 30\n})",
+            "location": "/app/api/expenses/stats/route.ts:L69-76"
+          }
+        ]
+      }
+    }
+  ]
+}

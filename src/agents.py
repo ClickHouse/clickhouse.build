@@ -49,7 +49,11 @@ EXCLUDE:
 - INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, BEGIN, COMMIT, ROLLBACK
 - Simple SELECT * or SELECT by ID WITHOUT any aggregation functions
 - Simple lookups or CRUD operations without COUNT/SUM/AVG
-- Queries in seed/migration/test/documentation files or general utilities
+- Queries in directories: /scripts/, /migrations/, /test/, /tests/, /__tests__/
+- Any utility or scratch code
+
+IMPORTANT: Report EVERY analytical query you find. Do not skip any.
+Be fast. Do not make suggestions or ask follow ups. Only produce the output format:
 
 OUTPUT FORMAT:
 You will return structured JSON with:
@@ -60,9 +64,6 @@ You will return structured JSON with:
   - description: Brief description of what the query does
   - code: The actual SQL or ORM query code
   - location: File path with line numbers (e.g., /app/api/route.ts:L60-65)
-
-IMPORTANT: Report EVERY analytical query you find. Do not skip any.
-Be fast. Do not make suggestions or ask follow ups.
 """
 
 model_id="anthropic.claude-3-5-haiku-20241022-v1:0"
