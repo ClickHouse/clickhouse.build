@@ -35,7 +35,7 @@ def main():
     print("✓ AWS credentials found and valid\n")
 
     # Define the repository path
-    repo_path = os.path.join(os.path.dirname(__file__), "test", "pg-expense-direct")
+    repo_path = os.path.join(os.path.dirname(__file__), "test", "pg-expense-prisma")
 
     # Verify the path exists
     if not os.path.exists(repo_path):
@@ -54,7 +54,16 @@ def main():
         print("ANALYSIS RESULTS")
         print("=" * 60)
         print()
-        print(result)
+
+        # Parse and pretty print JSON
+        try:
+            import json
+            result_json = json.loads(result)
+            print(json.dumps(result_json, indent=2))
+        except json.JSONDecodeError:
+            # Fallback to printing raw result if not valid JSON
+            print(result)
+
         print()
 
     except Exception as e:

@@ -1,6 +1,9 @@
 import logging
 import os
 import time
+import json
+from typing import List
+from pydantic import BaseModel, Field
 
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -8,6 +11,18 @@ from .utils import get_callback_handler, check_aws_credentials
 from .local_tools import glob, grep, read
 
 logger = logging.getLogger(__name__)
+
+# Structured output models
+class AnalyticalQuery(BaseModel):
+    """Represents a single analytical SQL query found in the codebase"""
+    description: str = Field(description="Brief description of what the query does")
+    code: str = Field(description="The SQL query code or ORM query code")
+    location: str = Field(description="File path with line numbers (e.g., /app/api/route.ts:L60-65)")
+
+class QueryAnalysisResult(BaseModel):
+    """Result of analyzing a codebase for analytical queries"""
+    tables: List[str] = Field(description="List of database tables used in the queries")
+    queries: List[AnalyticalQuery] = Field(description="List of analytical queries found")
 
 PROMPT_CODE_PLANNER = """
 You are a fast, efficient code analyzer. Find PostgreSQL analytical queries ONLY.
@@ -34,10 +49,12 @@ EXCLUDE:
 - Simple lookups or CRUD operations without COUNT/SUM/AVG
 
 OUTPUT FORMAT:
-Report ALL analytical queries found. For each query:
-- File path and line numbers (e.g., /app/api/route.ts:L10-15)
-- SQL query or ORM query code
-- Brief description
+You will return structured JSON with:
+- tables: List of all database tables found in the queries
+- queries: Array of query objects, each containing:
+  - description: Brief description of what the query does
+  - code: The actual SQL or ORM query code
+  - location: File path with line numbers (e.g., /app/api/route.ts:L60-65)
 
 IMPORTANT: Report EVERY analytical query you find. Do not skip any.
 Be fast. Do not make suggestions or ask follow ups.
@@ -62,7 +79,8 @@ def code_planner(repo_path: str) -> str:
             "AWS_REGION": os.getenv("AWS_REGION", "us-east-1"),
         }
 
-        code_reader_agent = Agent(
+        # Create agent with tools for analysis
+        analysis_agent = Agent(
             model=bedrock_model,
             system_prompt=PROMPT_CODE_PLANNER,
             tools=[glob, grep, read],
@@ -73,7 +91,21 @@ def code_planner(repo_path: str) -> str:
         start_time = time.time()
         logger.info(f"=== CODE PLANNER STARTED ===")
 
-        result = str(code_reader_agent(repo_path))
+        # Run agent with tools to find queries
+        analysis_result = str(analysis_agent(repo_path))
+
+        logger.info(f"Analysis result from agent: {analysis_result[:500]}...")
+
+        # Now use structured_output to extract the structure from the findings
+        extraction_agent = Agent(
+            model=bedrock_model,
+            system_prompt="Extract the analytical queries into structured format. Only include queries that were actually found in the codebase with real file locations."
+        )
+
+        result = extraction_agent.structured_output(
+            QueryAnalysisResult,
+            f"Extract all analytical queries from this analysis:\n\n{analysis_result}"
+        )
 
         # End timer
         end_time = time.time()
@@ -84,7 +116,11 @@ def code_planner(repo_path: str) -> str:
         logger.info(f"⏱️  Total execution time: {elapsed_time:.2f} seconds ({elapsed_time/60:.2f} minutes)")
         print(f"\n⏱️  Total execution time: {elapsed_time:.2f} seconds\n")
 
-        return result
+        # Convert Pydantic model to JSON string
+        if isinstance(result, QueryAnalysisResult):
+            return result.model_dump_json(indent=2)
+        else:
+            return json.dumps({"error": "Unexpected result type", "result": str(result)})
 
     except Exception as e:
         logger.error(f"Exception in code_reader: {type(e).__name__}: {e}")
