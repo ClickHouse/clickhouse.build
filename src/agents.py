@@ -22,6 +22,8 @@ class AnalyticalQuery(BaseModel):
 class QueryAnalysisResult(BaseModel):
     """Result of analyzing a codebase for analytical queries"""
     tables: List[str] = Field(description="List of database tables used in the queries")
+    total_tables: int = Field(description="The number of database tables found")
+    total_queries: int = Field(description="The number of analytical queries found")
     queries: List[AnalyticalQuery] = Field(description="List of analytical queries found")
 
 PROMPT_CODE_PLANNER = """
@@ -47,10 +49,13 @@ EXCLUDE:
 - INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, BEGIN, COMMIT, ROLLBACK
 - Simple SELECT * or SELECT by ID WITHOUT any aggregation functions
 - Simple lookups or CRUD operations without COUNT/SUM/AVG
+- Queries in seed/migration/test/documentation files or general utilities
 
 OUTPUT FORMAT:
 You will return structured JSON with:
 - tables: List of all database tables found in the queries
+- total_tables: The count of unique database tables (should equal length of tables array)
+- total_queries: The total count of analytical queries found (should equal length of queries array)
 - queries: Array of query objects, each containing:
   - description: Brief description of what the query does
   - code: The actual SQL or ORM query code
