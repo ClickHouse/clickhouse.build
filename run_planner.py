@@ -4,9 +4,9 @@ Planner script to run the code_planner agent on the test/pg-expense-direct proje
 This script will analyze the repository and find all PostgreSQL analytical queries.
 """
 
-import sys
-import os
 import logging
+import os
+import sys
 from pathlib import Path
 
 # Add src to path
@@ -17,14 +17,13 @@ from src.utils import check_aws_credentials
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
 
+
 def main():
-    # Check AWS credentials
     print("Checking AWS credentials...")
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
@@ -33,9 +32,8 @@ def main():
     print("✓ AWS credentials found and valid\n")
 
     # Define the repository path
-    repo_path = os.path.join(os.path.dirname(__file__), "test", "cal.com")
+    repo_path = os.path.join(os.path.dirname(__file__), "test", "umami")
 
-    # Verify the path exists
     if not os.path.exists(repo_path):
         print(f"Error: Repository path does not exist: {repo_path}")
         sys.exit(1)
@@ -56,6 +54,7 @@ def main():
         # Parse and pretty print JSON
         try:
             import json
+
             result_json = json.loads(result)
             print(json.dumps(result_json, indent=2))
         except json.JSONDecodeError:
@@ -68,6 +67,7 @@ def main():
         logger.error(f"Error running code planner: {e}")
         print(f"\nError: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

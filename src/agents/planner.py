@@ -1,13 +1,14 @@
+import json
 import logging
 import time
-import json
 from typing import List
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 from strands import Agent, tool
 from strands.models import BedrockModel
-from ..utils import get_callback_handler, check_aws_credentials
+
 from ..tools.planner import glob, grep, read
+from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
 
@@ -50,20 +51,29 @@ You will return structured JSON with:
 """
 
 # model_id="anthropic.claude-3-5-haiku-20241022-v1:0"
-model_id="us.anthropic.claude-sonnet-4-20250514-v1:0"
+model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+
 
 class AnalyticalQuery(BaseModel):
     """Represents a single analytical SQL query found in the codebase"""
+
     description: str = Field(description="Brief description of what the query does")
     code: str = Field(description="The SQL query code or ORM query code")
-    location: str = Field(description="File path with line numbers (e.g., /app/api/route.ts:L60-65)")
+    location: str = Field(
+        description="File path with line numbers (e.g., /app/api/route.ts:L60-65)"
+    )
+
 
 class QueryAnalysisResult(BaseModel):
     """Result of analyzing a codebase for analytical queries"""
+
     tables: List[str] = Field(description="List of database tables used in the queries")
     total_tables: int = Field(description="The number of database tables found")
     total_queries: int = Field(description="The number of analytical queries found")
-    queries: List[AnalyticalQuery] = Field(description="List of analytical queries found")
+    queries: List[AnalyticalQuery] = Field(
+        description="List of analytical queries found"
+    )
+
 
 @tool
 def agent_planner(repo_path: str) -> str:
@@ -92,12 +102,12 @@ def agent_planner(repo_path: str) -> str:
 
         extraction_agent = Agent(
             model=bedrock_model,
-            system_prompt="Extract the analytical queries into structured format. Only include queries that were found in the codebase with real file locations."
+            system_prompt="Extract the analytical queries into structured format. Only include queries that were found in the codebase with real file locations.",
         )
 
         result = extraction_agent.structured_output(
             QueryAnalysisResult,
-            f"Extract all analytical queries from this analysis:\n\n{analysis_result}"
+            f"Extract all analytical queries from this analysis:\n\n{analysis_result}",
         )
 
         end_time = time.time()
@@ -105,13 +115,17 @@ def agent_planner(repo_path: str) -> str:
 
         logger.info(f"=== CODE PLANNER COMPLETED ===")
         logger.info(f"Repository: {repo_path}")
-        logger.info(f"⏱️  Total execution time: {elapsed_time:.2f} seconds ({elapsed_time/60:.2f} minutes)")
+        logger.info(
+            f"⏱️  Total execution time: {elapsed_time:.2f} seconds ({elapsed_time/60:.2f} minutes)"
+        )
         print(f"\n⏱️  Total execution time: {elapsed_time:.2f} seconds\n")
 
         if isinstance(result, QueryAnalysisResult):
             return result.model_dump_json(indent=2)
         else:
-            return json.dumps({"error": "Unexpected result type", "result": str(result)})
+            return json.dumps(
+                {"error": "Unexpected result type", "result": str(result)}
+            )
 
     except Exception as e:
         logger.error(f"Exception in code_reader: {type(e).__name__}: {e}")

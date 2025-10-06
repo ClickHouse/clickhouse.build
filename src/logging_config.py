@@ -9,13 +9,14 @@ import logging
 import logging.handlers
 import os
 import sys
-from pathlib import Path
-from typing import Optional, Dict, Any
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 
 class LogLevel(Enum):
     """Available log levels."""
+
     DEBUG = logging.DEBUG
     INFO = logging.INFO
     WARNING = logging.WARNING
@@ -25,7 +26,7 @@ class LogLevel(Enum):
 
 class LoggerConfig:
     """Configuration for the centralized logging system."""
-    
+
     def __init__(
         self,
         log_dir: Optional[Path] = None,
@@ -34,11 +35,11 @@ class LoggerConfig:
         file_output: bool = True,
         max_file_size: int = 10 * 1024 * 1024,  # 10MB
         backup_count: int = 5,
-        format_string: Optional[str] = None
+        format_string: Optional[str] = None,
     ):
         """
         Initialize logger configuration.
-        
+
         Args:
             log_dir: Directory for log files (default: ./logs)
             log_level: Minimum log level to capture
@@ -54,28 +55,26 @@ class LoggerConfig:
         self.file_output = file_output
         self.max_file_size = max_file_size
         self.backup_count = backup_count
-        
+
         # Default format string
         if format_string is None:
-            self.format_string = (
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
+            self.format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         else:
             self.format_string = format_string
 
 
 class CentralizedLogger:
     """Centralized logging system for the application."""
-    
-    _instance: Optional['CentralizedLogger'] = None
+
+    _instance: Optional["CentralizedLogger"] = None
     _initialized: bool = False
-    
-    def __new__(cls) -> 'CentralizedLogger':
+
+    def __new__(cls) -> "CentralizedLogger":
         """Singleton pattern to ensure only one logger instance."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         """Initialize the centralized logger (only once)."""
         if not self._initialized:
@@ -83,78 +82,78 @@ class CentralizedLogger:
             self.loggers: Dict[str, logging.Logger] = {}
             self.handlers: Dict[str, logging.Handler] = {}
             self._initialized = True
-    
+
     def setup(self, config: LoggerConfig) -> None:
         """
         Set up the centralized logging system.
-        
+
         Args:
             config: LoggerConfig instance with logging configuration
         """
         self.config = config
-        
+
         # Create log directory if it doesn't exist
         if config.file_output:
             config.log_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Set up root logger
         root_logger = logging.getLogger()
         root_logger.setLevel(config.log_level.value)
-        
+
         # Clear existing handlers to avoid duplicates
         root_logger.handlers.clear()
-        
+
         # Create formatter
         formatter = logging.Formatter(config.format_string)
-        
+
         # Set up file handler
         if config.file_output:
             file_handler = logging.handlers.RotatingFileHandler(
                 config.log_dir / "app.log",
                 maxBytes=config.max_file_size,
                 backupCount=config.backup_count,
-                encoding='utf-8'
+                encoding="utf-8",
             )
             file_handler.setLevel(config.log_level.value)
             file_handler.setFormatter(formatter)
             root_logger.addHandler(file_handler)
-            self.handlers['file'] = file_handler
-        
+            self.handlers["file"] = file_handler
+
         # Set up console handler
         if config.console_output:
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(config.log_level.value)
             console_handler.setFormatter(formatter)
             root_logger.addHandler(console_handler)
-            self.handlers['console'] = console_handler
-        
+            self.handlers["console"] = console_handler
+
         # Set up specific loggers for external libraries
         self._configure_external_loggers()
-    
+
     def _configure_external_loggers(self) -> None:
         """Configure logging levels for external libraries."""
         # Reduce verbosity of external libraries
         external_loggers = {
-            'asyncio': logging.WARNING,
-            'urllib3': logging.WARNING,
-            'requests': logging.WARNING,
-            'boto3': logging.WARNING,
-            'botocore': logging.WARNING,
-            'strands': logging.INFO,
-            'textual': logging.WARNING,
+            "asyncio": logging.WARNING,
+            "urllib3": logging.WARNING,
+            "requests": logging.WARNING,
+            "boto3": logging.WARNING,
+            "botocore": logging.WARNING,
+            "strands": logging.INFO,
+            "textual": logging.WARNING,
         }
-        
+
         for logger_name, level in external_loggers.items():
             logger = logging.getLogger(logger_name)
             logger.setLevel(level)
-    
+
     def get_logger(self, name: str) -> logging.Logger:
         """
         Get a logger instance for the specified name.
-        
+
         Args:
             name: Name of the logger (usually module name)
-            
+
         Returns:
             logging.Logger: Configured logger instance
         """
@@ -163,47 +162,49 @@ class CentralizedLogger:
             if self.config:
                 logger.setLevel(self.config.log_level.value)
             self.loggers[name] = logger
-        
+
         return self.loggers[name]
-    
+
     def set_level(self, level: LogLevel) -> None:
         """
         Change the logging level for all loggers.
-        
+
         Args:
             level: New log level to set
         """
         if self.config:
             self.config.log_level = level
-        
+
         # Update root logger
         root_logger = logging.getLogger()
         root_logger.setLevel(level.value)
-        
+
         # Update all handlers
         for handler in self.handlers.values():
             handler.setLevel(level.value)
-        
+
         # Update all managed loggers
         for logger in self.loggers.values():
             logger.setLevel(level.value)
-    
+
     def enable_console_output(self) -> None:
         """Enable console output."""
-        if 'console' not in self.handlers and self.config:
+        if "console" not in self.handlers and self.config:
             formatter = logging.Formatter(self.config.format_string)
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(self.config.log_level.value)
             console_handler.setFormatter(formatter)
-            
+
             root_logger = logging.getLogger()
             root_logger.addHandler(console_handler)
-            self.handlers['console'] = console_handler
-    
-    def add_file_handler(self, name: str, file_path: Path, level: LogLevel = LogLevel.INFO) -> None:
+            self.handlers["console"] = console_handler
+
+    def add_file_handler(
+        self, name: str, file_path: Path, level: LogLevel = LogLevel.INFO
+    ) -> None:
         """
         Add an additional file handler for specific logging.
-        
+
         Args:
             name: Name of the handler
             file_path: Path to the log file
@@ -211,40 +212,40 @@ class CentralizedLogger:
         """
         if self.config and name not in self.handlers:
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             handler = logging.handlers.RotatingFileHandler(
                 file_path,
                 maxBytes=self.config.max_file_size,
                 backupCount=self.config.backup_count,
-                encoding='utf-8'
+                encoding="utf-8",
             )
             handler.setLevel(level.value)
             handler.setFormatter(logging.Formatter(self.config.format_string))
-            
+
             root_logger = logging.getLogger()
             root_logger.addHandler(handler)
             self.handlers[name] = handler
-    
+
     def get_log_stats(self) -> Dict[str, Any]:
         """
         Get statistics about the logging system.
-        
+
         Returns:
             Dict with logging statistics
         """
         stats = {
-            'initialized': self._initialized,
-            'config': {
-                'log_dir': str(self.config.log_dir) if self.config else None,
-                'log_level': self.config.log_level.name if self.config else None,
-                'console_output': self.config.console_output if self.config else None,
-                'file_output': self.config.file_output if self.config else None,
+            "initialized": self._initialized,
+            "config": {
+                "log_dir": str(self.config.log_dir) if self.config else None,
+                "log_level": self.config.log_level.name if self.config else None,
+                "console_output": self.config.console_output if self.config else None,
+                "file_output": self.config.file_output if self.config else None,
             },
-            'handlers': list(self.handlers.keys()),
-            'loggers': list(self.loggers.keys()),
-            'log_files': []
+            "handlers": list(self.handlers.keys()),
+            "loggers": list(self.loggers.keys()),
+            "log_files": [],
         }
-        
+
         # Get log file information
         if self.config and self.config.file_output:
             log_dir = self.config.log_dir
@@ -252,14 +253,16 @@ class CentralizedLogger:
                 for log_file in log_dir.glob("*.log*"):
                     try:
                         stat = log_file.stat()
-                        stats['log_files'].append({
-                            'name': log_file.name,
-                            'size': stat.st_size,
-                            'modified': stat.st_mtime
-                        })
+                        stats["log_files"].append(
+                            {
+                                "name": log_file.name,
+                                "size": stat.st_size,
+                                "modified": stat.st_mtime,
+                            }
+                        )
                     except Exception:
                         pass
-        
+
         return stats
 
 
@@ -275,28 +278,28 @@ def setup_logging(
 ) -> CentralizedLogger:
     """
     Set up the centralized logging system.
-    
+
     Args:
         log_dir: Directory for log files
         log_level: Minimum log level to capture
         console_output: Whether to output to console
         file_output: Whether to output to file
-        
+
     Returns:
         CentralizedLogger: The configured logger instance
     """
     global _central_logger
-    
+
     if _central_logger is None:
         _central_logger = CentralizedLogger()
-    
+
     config = LoggerConfig(
         log_dir=log_dir,
         log_level=log_level,
         console_output=console_output,
-        file_output=file_output
+        file_output=file_output,
     )
-    
+
     _central_logger.setup(config)
     return _central_logger
 
@@ -304,38 +307,39 @@ def setup_logging(
 def get_logger(name: str) -> logging.Logger:
     """
     Get a logger instance for the specified name.
-    
+
     Args:
         name: Name of the logger (usually module name)
-        
+
     Returns:
         logging.Logger: Configured logger instance
     """
     global _central_logger
-    
+
     if _central_logger is None:
         # Auto-initialize with default settings
         _central_logger = setup_logging()
-    
+
     return _central_logger.get_logger(name)
 
 
 def set_log_level(level: LogLevel) -> None:
     """
     Change the logging level for all loggers.
-    
+
     Args:
         level: New log level to set
     """
     global _central_logger
-    
+
     if _central_logger is not None:
         _central_logger.set_level(level)
+
 
 def enable_console_logging() -> None:
     """Enable console output."""
     global _central_logger
-    
+
     if _central_logger is not None:
         _central_logger.enable_console_output()
 

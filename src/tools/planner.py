@@ -1,13 +1,14 @@
+import glob as glob_module
 import json
 import logging
 import os
-import glob as glob_module
 import re
 from pathlib import Path
 
 from strands import tool
 
 logger = logging.getLogger(__name__)
+
 
 @tool
 def glob(pattern: str, path: str = ".") -> str:
@@ -27,10 +28,7 @@ def glob(pattern: str, path: str = ".") -> str:
         search_path = Path(path).resolve()
 
         if not search_path.exists():
-            return json.dumps({
-                "error": f"Path does not exist: {path}",
-                "files": []
-            })
+            return json.dumps({"error": f"Path does not exist: {path}", "files": []})
 
         # Use glob to find matching files
         matches = []
@@ -38,10 +36,9 @@ def glob(pattern: str, path: str = ".") -> str:
 
         for file_path in glob_module.glob(full_pattern, recursive=True):
             if os.path.isfile(file_path):
-                matches.append({
-                    "path": file_path,
-                    "mtime": os.path.getmtime(file_path)
-                })
+                matches.append(
+                    {"path": file_path, "mtime": os.path.getmtime(file_path)}
+                )
 
         # Sort by modification time (most recent first)
         matches.sort(key=lambda x: x["mtime"], reverse=True)
@@ -49,23 +46,31 @@ def glob(pattern: str, path: str = ".") -> str:
         # Return just the paths
         file_paths = [m["path"] for m in matches]
 
-        return json.dumps({
-            "pattern": pattern,
-            "search_path": str(search_path),
-            "count": len(file_paths),
-            "files": file_paths
-        }, indent=2)
+        return json.dumps(
+            {
+                "pattern": pattern,
+                "search_path": str(search_path),
+                "count": len(file_paths),
+                "files": file_paths,
+            },
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Error in glob: {e}")
-        return json.dumps({
-            "error": str(e),
-            "files": []
-        })
+        return json.dumps({"error": str(e), "files": []})
+
 
 @tool
-def grep(pattern: str, path: str = ".", file_pattern: str = None, case_insensitive: bool = False,
-         show_line_numbers: bool = False, context_lines: int = 0, output_mode: str = "files") -> str:
+def grep(
+    pattern: str,
+    path: str = ".",
+    file_pattern: str = None,
+    case_insensitive: bool = False,
+    show_line_numbers: bool = False,
+    context_lines: int = 0,
+    output_mode: str = "files",
+) -> str:
     """
     Search for a pattern in files within the specified directory.
     Similar to Claude Code's Grep tool for content searching.
@@ -87,25 +92,21 @@ def grep(pattern: str, path: str = ".", file_pattern: str = None, case_insensiti
         search_path = Path(path).resolve()
 
         if not search_path.exists():
-            return json.dumps({
-                "error": f"Path does not exist: {path}",
-                "results": []
-            })
+            return json.dumps({"error": f"Path does not exist: {path}", "results": []})
 
         # Compile regex pattern
         flags = re.IGNORECASE if case_insensitive else 0
         try:
             regex = re.compile(pattern, flags)
         except re.error as e:
-            return json.dumps({
-                "error": f"Invalid regex pattern: {e}",
-                "results": []
-            })
+            return json.dumps({"error": f"Invalid regex pattern: {e}", "results": []})
 
         # Find files to search
         if file_pattern:
             files_to_search = []
-            for file_path in glob_module.glob(str(search_path / file_pattern), recursive=True):
+            for file_path in glob_module.glob(
+                str(search_path / file_pattern), recursive=True
+            ):
                 if os.path.isfile(file_path):
                     files_to_search.append(file_path)
         else:
@@ -113,35 +114,47 @@ def grep(pattern: str, path: str = ".", file_pattern: str = None, case_insensiti
             files_to_search = []
             for root, dirs, files in os.walk(search_path):
                 # Skip common directories
-                dirs[:] = [d for d in dirs if d not in {'.git', 'node_modules', '__pycache__', '.venv', 'venv', '.next', 'dist', 'build'}]
+                dirs[:] = [
+                    d
+                    for d in dirs
+                    if d
+                    not in {
+                        ".git",
+                        "node_modules",
+                        "__pycache__",
+                        ".venv",
+                        "venv",
+                        ".next",
+                        "dist",
+                        "build",
+                    }
+                ]
                 for file in files:
                     files_to_search.append(os.path.join(root, file))
 
         # Filter to only code/SQL files
-        allowed_extensions = {'.ts', '.tsx', '.js', '.jsx', '.sql'}
-        files_to_search = [f for f in files_to_search if os.path.splitext(f)[1] in allowed_extensions]
+        allowed_extensions = {".ts", ".tsx", ".js", ".jsx", ".sql"}
+        files_to_search = [
+            f for f in files_to_search if os.path.splitext(f)[1] in allowed_extensions
+        ]
 
         results = []
 
         print(f"files_to_search: {files_to_search}")
         for file_path in files_to_search:
             try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
 
                 matches = []
                 for line_num, line in enumerate(lines, start=1):
                     if regex.search(line):
-                        matches.append({
-                            "line_number": line_num,
-                            "content": line.rstrip('\n')
-                        })
+                        matches.append(
+                            {"line_number": line_num, "content": line.rstrip("\n")}
+                        )
 
                 if matches:
-                    result_entry = {
-                        "file": file_path,
-                        "match_count": len(matches)
-                    }
+                    result_entry = {"file": file_path, "match_count": len(matches)}
 
                     if output_mode == "content":
                         if context_lines > 0:
@@ -154,16 +167,19 @@ def grep(pattern: str, path: str = ".", file_pattern: str = None, case_insensiti
 
                                 context = []
                                 for i in range(start, end + 1):
-                                    context.append({
-                                        "line_number": i if show_line_numbers else None,
-                                        "content": lines[i - 1].rstrip('\n'),
-                                        "is_match": i == line_num
-                                    })
+                                    context.append(
+                                        {
+                                            "line_number": (
+                                                i if show_line_numbers else None
+                                            ),
+                                            "content": lines[i - 1].rstrip("\n"),
+                                            "is_match": i == line_num,
+                                        }
+                                    )
 
-                                enhanced_matches.append({
-                                    "match_line": line_num,
-                                    "context": context
-                                })
+                                enhanced_matches.append(
+                                    {"match_line": line_num, "context": context}
+                                )
 
                             result_entry["matches"] = enhanced_matches
                         else:
@@ -172,39 +188,47 @@ def grep(pattern: str, path: str = ".", file_pattern: str = None, case_insensiti
                     results.append(result_entry)
 
             except (UnicodeDecodeError, PermissionError):
-                # Skip files that can't be read
                 continue
 
-        # Format output based on mode
         if output_mode == "files":
-            return json.dumps({
-                "pattern": pattern,
-                "search_path": str(search_path),
-                "files_with_matches": [r["file"] for r in results],
-                "count": len(results)
-            }, indent=2)
+            return json.dumps(
+                {
+                    "pattern": pattern,
+                    "search_path": str(search_path),
+                    "files_with_matches": [r["file"] for r in results],
+                    "count": len(results),
+                },
+                indent=2,
+            )
         elif output_mode == "count":
-            return json.dumps({
-                "pattern": pattern,
-                "search_path": str(search_path),
-                "results": [{"file": r["file"], "matches": r["match_count"]} for r in results],
-                "total_matches": sum(r["match_count"] for r in results)
-            }, indent=2)
+            return json.dumps(
+                {
+                    "pattern": pattern,
+                    "search_path": str(search_path),
+                    "results": [
+                        {"file": r["file"], "matches": r["match_count"]}
+                        for r in results
+                    ],
+                    "total_matches": sum(r["match_count"] for r in results),
+                },
+                indent=2,
+            )
         else:  # content
-            return json.dumps({
-                "pattern": pattern,
-                "search_path": str(search_path),
-                "results": results,
-                "total_files": len(results),
-                "total_matches": sum(r["match_count"] for r in results)
-            }, indent=2)
+            return json.dumps(
+                {
+                    "pattern": pattern,
+                    "search_path": str(search_path),
+                    "results": results,
+                    "total_files": len(results),
+                    "total_matches": sum(r["match_count"] for r in results),
+                },
+                indent=2,
+            )
 
     except Exception as e:
         logger.error(f"Error in grep: {e}")
-        return json.dumps({
-            "error": str(e),
-            "results": []
-        })
+        return json.dumps({"error": str(e), "results": []})
+
 
 @tool
 def read(file_path: str, offset: int = 0, limit: int = None) -> str:
@@ -224,24 +248,22 @@ def read(file_path: str, offset: int = 0, limit: int = None) -> str:
         path = Path(file_path).resolve()
 
         if not path.exists():
-            return json.dumps({
-                "error": f"File does not exist: {file_path}",
-                "content": ""
-            })
+            return json.dumps(
+                {"error": f"File does not exist: {file_path}", "content": ""}
+            )
 
         if not path.is_file():
-            return json.dumps({
-                "error": f"Path is not a file: {file_path}",
-                "content": ""
-            })
+            return json.dumps(
+                {"error": f"Path is not a file: {file_path}", "content": ""}
+            )
 
         # Read file
-        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
 
         # Apply offset and limit
         if limit:
-            selected_lines = lines[offset:offset + limit]
+            selected_lines = lines[offset : offset + limit]
         else:
             selected_lines = lines[offset:]
 
@@ -252,17 +274,17 @@ def read(file_path: str, offset: int = 0, limit: int = None) -> str:
 
         content = "\n".join(formatted_lines)
 
-        return json.dumps({
-            "file": str(path),
-            "total_lines": len(lines),
-            "offset": offset,
-            "lines_returned": len(selected_lines),
-            "content": content
-        }, indent=2)
+        return json.dumps(
+            {
+                "file": str(path),
+                "total_lines": len(lines),
+                "offset": offset,
+                "lines_returned": len(selected_lines),
+                "content": content,
+            },
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Error in read: {e}")
-        return json.dumps({
-            "error": str(e),
-            "content": ""
-        })
+        return json.dumps({"error": str(e), "content": ""})
