@@ -1,5 +1,4 @@
 import os
-import yaml
 from pathlib import Path
 from strands.handlers.callback_handler import PrintingCallbackHandler
 
@@ -15,21 +14,6 @@ def get_callback_handler():
         return None
     else:
         return PrintingCallbackHandler()
-
-
-def load_config():
-    """Load configuration from config.yaml file."""
-    project_root = Path(__file__).parent.parent
-    config_path = project_root / "config.yaml"
-    
-    if not config_path.exists():
-        raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    
-    try:
-        with open(config_path, 'r') as f:
-            return yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML in config file: {e}")
 
 
 def check_aws_credentials():
@@ -68,7 +52,3 @@ def check_aws_credentials():
                      "4. Create ~/.aws/credentials file"
     except Exception as e:
         return False, f"Error checking AWS credentials: {str(e)}"
-
-
-# Export configuration object
-CONFIG = load_config()

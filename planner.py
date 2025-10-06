@@ -12,7 +12,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.agents import code_planner
+from src.agents.planner import agent_planner
 from src.utils import check_aws_credentials
 
 # Configure logging
@@ -48,7 +48,7 @@ def main():
 
     # Run the code planner
     try:
-        result = code_planner(repo_path)
+        result = agent_planner(repo_path)
 
         print("\n" + "=" * 60)
         print("ANALYSIS RESULTS")

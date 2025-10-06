@@ -7,30 +7,14 @@ from pydantic import BaseModel, Field
 
 from strands import Agent, tool
 from strands.models import BedrockModel
-from .utils import get_callback_handler, check_aws_credentials
-from .local_tools import glob, grep, read
+from ..utils import get_callback_handler, check_aws_credentials
+from ..tools.planner import glob, grep, read
 
 logger = logging.getLogger(__name__)
-
-# Structured output models
-class AnalyticalQuery(BaseModel):
-    """Represents a single analytical SQL query found in the codebase"""
-    description: str = Field(description="Brief description of what the query does")
-    code: str = Field(description="The SQL query code or ORM query code")
-    location: str = Field(description="File path with line numbers (e.g., /app/api/route.ts:L60-65)")
-
-class QueryAnalysisResult(BaseModel):
-    """Result of analyzing a codebase for analytical queries"""
-    tables: List[str] = Field(description="List of database tables used in the queries")
-    total_tables: int = Field(description="The number of database tables found")
-    total_queries: int = Field(description="The number of analytical queries found")
-    queries: List[AnalyticalQuery] = Field(description="List of analytical queries found")
 
 PROMPT_CODE_PLANNER = """
 You are a fast, efficient code analyzer. Find PostgreSQL analytical queries ONLY.
 Queries may be raw SQL strings OR ORM queries (Prisma, DrizzleORM, TypeORM, etc).
-
-CRITICAL: The user will provide a repository path. You MUST use that exact path in your tool calls.
 
 STRATEGY:
 1. First search for raw SQL: grep with pattern="SELECT.*FROM", case_insensitive=True, output_mode="content", show_line_numbers=True
@@ -52,7 +36,7 @@ EXCLUDE:
 - Queries in directories: /scripts/, /migrations/, /test/, /tests/, /__tests__/
 - Any utility or scratch code
 
-IMPORTANT: Report EVERY analytical query you find. Do not skip any.
+IMPORTANT: Report EVERY analytical query you find. Do not skip any. Do not duplicate any queries
 Be fast. Do not make suggestions or ask follow ups. Only produce the output format:
 
 OUTPUT FORMAT:
@@ -68,9 +52,22 @@ You will return structured JSON with:
 
 model_id="anthropic.claude-3-5-haiku-20241022-v1:0"
 
+class AnalyticalQuery(BaseModel):
+    """Represents a single analytical SQL query found in the codebase"""
+    description: str = Field(description="Brief description of what the query does")
+    code: str = Field(description="The SQL query code or ORM query code")
+    location: str = Field(description="File path with line numbers (e.g., /app/api/route.ts:L60-65)")
+
+class QueryAnalysisResult(BaseModel):
+    """Result of analyzing a codebase for analytical queries"""
+    tables: List[str] = Field(description="List of database tables used in the queries")
+    total_tables: int = Field(description="The number of database tables found")
+    total_queries: int = Field(description="The number of analytical queries found")
+    queries: List[AnalyticalQuery] = Field(description="List of analytical queries found")
+
 @tool
-def code_planner(repo_path: str) -> str:
-    logger.info(f"code_planner starting analysis of repository: {repo_path}")
+def agent_planner(repo_path: str) -> str:
+    logger.info(f"agent_planner starting analysis of repository: {repo_path}")
 
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
@@ -79,13 +76,6 @@ def code_planner(repo_path: str) -> str:
     bedrock_model = BedrockModel(model_id=model_id)
 
     try:
-        env = {
-            "FASTMCP_LOG_LEVEL": "ERROR",
-            "AWS_PROFILE": os.getenv("AWS_PROFILE", "default"),
-            "AWS_REGION": os.getenv("AWS_REGION", "us-east-1"),
-        }
-
-        # Create agent with tools for analysis
         analysis_agent = Agent(
             model=bedrock_model,
             system_prompt=PROMPT_CODE_PLANNER,
@@ -93,19 +83,16 @@ def code_planner(repo_path: str) -> str:
             callback_handler=get_callback_handler(),
         )
 
-        # Start timer
         start_time = time.time()
         logger.info(f"=== CODE PLANNER STARTED ===")
 
-        # Run agent with tools to find queries
         analysis_result = str(analysis_agent(repo_path))
 
         logger.info(f"Analysis result from agent: {analysis_result[:500]}...")
 
-        # Now use structured_output to extract the structure from the findings
         extraction_agent = Agent(
             model=bedrock_model,
-            system_prompt="Extract the analytical queries into structured format. Only include queries that were actually found in the codebase with real file locations."
+            system_prompt="Extract the analytical queries into structured format. Only include queries that were found in the codebase with real file locations."
         )
 
         result = extraction_agent.structured_output(
@@ -113,7 +100,6 @@ def code_planner(repo_path: str) -> str:
             f"Extract all analytical queries from this analysis:\n\n{analysis_result}"
         )
 
-        # End timer
         end_time = time.time()
         elapsed_time = end_time - start_time
 
@@ -122,7 +108,6 @@ def code_planner(repo_path: str) -> str:
         logger.info(f"⏱️  Total execution time: {elapsed_time:.2f} seconds ({elapsed_time/60:.2f} minutes)")
         print(f"\n⏱️  Total execution time: {elapsed_time:.2f} seconds\n")
 
-        # Convert Pydantic model to JSON string
         if isinstance(result, QueryAnalysisResult):
             return result.model_dump_json(indent=2)
         else:

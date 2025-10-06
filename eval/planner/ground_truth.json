@@ -11,25 +11,21 @@
           {
             "description": "Total expenses aggregation",
             "location": "/app/api/expenses/stats/route.ts:L27-30",
-            "has_aggregation": true,
             "query_type": "raw_sql"
           },
           {
             "description": "Expenses by category",
             "location": "/app/api/expenses/stats/route.ts:L33-42",
-            "has_aggregation": true,
             "query_type": "raw_sql"
           },
           {
             "description": "Monthly expenses aggregation",
             "location": "/app/api/expenses/stats/route.ts:L45-54",
-            "has_aggregation": true,
             "query_type": "raw_sql"
           },
           {
             "description": "Daily expenses aggregation",
             "location": "/app/api/expenses/stats/route.ts:L57-67",
-            "has_aggregation": true,
             "query_type": "raw_sql"
           }
         ]
@@ -46,25 +42,21 @@
           {
             "description": "Total expenses count and sum",
             "location": "/app/api/expenses/stats/route.ts:L27-30",
-            "has_aggregation": true,
             "query_type": "orm"
           },
           {
             "description": "Expenses by category",
             "location": "/app/api/expenses/stats/route.ts:L35-41",
-            "has_aggregation": true,
             "query_type": "orm"
           },
           {
             "description": "Monthly expenses",
             "location": "/app/api/expenses/stats/route.ts:L45-52",
-            "has_aggregation": true,
             "query_type": "orm"
           },
           {
             "description": "Daily expenses",
             "location": "/app/api/expenses/stats/route.ts:L57-62",
-            "has_aggregation": true,
             "query_type": "orm"
           }
         ]
@@ -81,25 +73,21 @@
           {
             "description": "Total expenses aggregation",
             "location": "/app/api/expenses/stats/route.ts:L27-32",
-            "has_aggregation": true,
             "query_type": "orm"
           },
           {
             "description": "Category aggregation",
             "location": "/app/api/expenses/stats/route.ts:L36-46",
-            "has_aggregation": true,
             "query_type": "orm"
           },
           {
             "description": "Monthly aggregation",
             "location": "/app/api/expenses/stats/route.ts:L50-60",
-            "has_aggregation": true,
             "query_type": "orm"
           },
           {
             "description": "Daily aggregation",
             "location": "/app/api/expenses/stats/route.ts:L64-74",
-            "has_aggregation": true,
             "query_type": "orm"
           }
         ]

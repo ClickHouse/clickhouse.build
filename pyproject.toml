@@ -1,6 +1,6 @@
 [project]
 name = "clickhouse-build"
-version = "0.1.0"
+version = "1.0.0"
 description = "PostgreSQL to ClickHouse Migration Tool with AI-powered query conversion"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -15,7 +15,6 @@ dependencies = [
     "questionary>=2.1.1",
     "rich>=14.1.0",
     "textual>=6.1.0",
-    "ripgrep>=14.1.0",
 ]
 
 [project.scripts]

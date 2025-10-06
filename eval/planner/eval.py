@@ -12,10 +12,9 @@ from pathlib import Path
 from typing import Dict, List, Any
 from dataclasses import dataclass
 
-# Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.agents import code_planner
+from src.agents.planner import agent_planner
 from src.utils import check_aws_credentials
 
 # Configure logging
@@ -129,9 +128,8 @@ def run_single_eval(test_case: Dict, base_path: str) -> Dict[str, Any]:
             'error': f"Repository path does not exist: {repo_path}"
         }
 
-    # Run the code planner
     try:
-        result_json = code_planner(repo_path)
+        result_json = agent_planner(repo_path)
         actual = json.loads(result_json)
     except Exception as e:
         return {

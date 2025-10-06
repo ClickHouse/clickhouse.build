@@ -1,8 +1,0 @@
-clickhouse_urls:
-  npm_package: "https://www.npmjs.com/package/@clickhouse/client"
-  github_releases: "https://github.com/ClickHouse/clickhouse-js/releases"
-  documentation:
-    js-client: "https://clickhouse.com/docs/en/integrations/language-clients/javascript"
-    getting-started: "https://clickhouse.com/docs/en/getting-started"
-    sql-reference: "https://clickhouse.com/docs/en/sql-reference"
-  base_docs: "https://clickhouse.com/docs/en"
