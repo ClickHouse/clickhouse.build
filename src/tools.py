@@ -4,16 +4,71 @@ import logging
 import os
 import subprocess
 import semver
+import glob as glob_module
+from pathlib import Path
 
 from strands import Agent, tool
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from mcp import stdio_client, StdioServerParameters
-from strands_tools import shell, http_request, editor, file_write
+from strands_tools import shell, http_request, file_write
 from .utils import get_callback_handler, CONFIG, check_aws_credentials
 from .prompts import CODE_ANALYSIS_PROMPT, CODE_WRITER_PROMPT, CODE_CONVERTER_PROMPT, DOCUMENTATION_ANALYSIS_PROMPT
 
 logger = logging.getLogger(__name__)
+
+@tool
+def glob(pattern: str, path: str = ".") -> str:
+    """
+    Find files matching a glob pattern in the specified directory.
+    Similar to Claude Code's Glob tool for file pattern matching.
+
+    Args:
+        pattern: The glob pattern to match (e.g., "**/*.py", "*.js", "src/**/*.ts")
+        path: The directory to search in (defaults to current directory)
+
+    Returns:
+        JSON string containing list of matching file paths sorted by modification time
+    """
+    try:
+        search_path = Path(path).resolve()
+
+        if not search_path.exists():
+            return json.dumps({
+                "error": f"Path does not exist: {path}",
+                "files": []
+            })
+
+        # Use glob to find matching files
+        matches = []
+        full_pattern = str(search_path / pattern)
+
+        for file_path in glob_module.glob(full_pattern, recursive=True):
+            if os.path.isfile(file_path):
+                matches.append({
+                    "path": file_path,
+                    "mtime": os.path.getmtime(file_path)
+                })
+
+        # Sort by modification time (most recent first)
+        matches.sort(key=lambda x: x["mtime"], reverse=True)
+
+        # Return just the paths
+        file_paths = [m["path"] for m in matches]
+
+        return json.dumps({
+            "pattern": pattern,
+            "search_path": str(search_path),
+            "count": len(file_paths),
+            "files": file_paths
+        }, indent=2)
+
+    except Exception as e:
+        logger.error(f"Error in glob: {e}")
+        return json.dumps({
+            "error": str(e),
+            "files": []
+        })
 
 def _get_user_approval(file_path: str, content: str, original_content: str = "", change_type: str = "update", detailed_prompt: str = None) -> str:
     """
