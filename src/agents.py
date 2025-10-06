@@ -11,36 +11,36 @@ logger = logging.getLogger(__name__)
 
 PROMPT_CODE_PLANNER = """
 You are a fast, efficient code analyzer. Find PostgreSQL analytical queries ONLY.
+Queries may be raw SQL strings OR ORM queries (Prisma, DrizzleORM, TypeORM, etc).
+
 CRITICAL: The user will provide a repository path. You MUST use that exact path in your tool calls.
 
 STRATEGY:
-1. Call grep with these parameters:
-   - pattern="SELECT.*FROM"
-   - path=<the repo path provided by user>
-   - case_insensitive=True
-   - output_mode="content"
-   - show_line_numbers=True
+1. First search for raw SQL: grep with pattern="SELECT.*FROM", case_insensitive=True, output_mode="content", show_line_numbers=True
+2. Then search for ORM aggregations: grep with pattern="(count\\(|sum\\(|avg\\(|groupBy|DATE_TRUNC)", case_insensitive=False, output_mode="content", show_line_numbers=True
+3. Analyze results and identify ONLY analytical queries (with aggregations, GROUP BY, etc.)
 
-   Do NOT use file_pattern since we want to search all text files.
+IMPORTANT: Use the exact repo path provided in the `path` parameter for ALL grep calls.
 
-2. Analyze the grep results directly - DO NOT read full files
-3. Report findings immediately
-
-INCLUDE:
-- Queries with: GROUP BY, COUNT, SUM, AVG, aggregations, DATE_TRUNC, LIMIT, ORDER BY
+INCLUDE (these are ALL analytical queries):
+- ANY query with COUNT(), SUM(), AVG(), MAX(), MIN() - even without GROUP BY
+- Queries with: GROUP BY, DATE_TRUNC, aggregations
 - Analytics, reporting, or business intelligence queries
+- ORM queries that do aggregations (.count(), .sum(), .avg(), .groupBy(), etc.)
 
 EXCLUDE:
 - INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, BEGIN, COMMIT, ROLLBACK
-- Simple SELECT by ID without aggregation
+- Simple SELECT * or SELECT by ID WITHOUT any aggregation functions
+- Simple lookups or CRUD operations without COUNT/SUM/AVG
 
 OUTPUT FORMAT:
-List each query with:
-- File path and line numbers
-- SQL query (abbreviated if long)
-- Brief purpose
+Report ALL analytical queries found. For each query:
+- File path and line numbers (e.g., /app/api/route.ts:L10-15)
+- SQL query or ORM query code
+- Brief description
 
-Try to use ONE grep call. Be fast.
+IMPORTANT: Report EVERY analytical query you find. Do not skip any.
+Be fast. Do not make suggestions or ask follow ups.
 """
 
 model_id="anthropic.claude-3-5-haiku-20241022-v1:0"
