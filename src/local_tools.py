@@ -1,3 +1,4 @@
+from enum import Enum
 import json
 import logging
 import os
@@ -13,7 +14,6 @@ logger = logging.getLogger(__name__)
 def glob(pattern: str, path: str = ".") -> str:
     """
     Find files matching a glob pattern in the specified directory.
-    Respects .gitignore patterns if a .gitignore file exists.
     Similar to Claude Code's Glob tool for file pattern matching.
 
     Args:
@@ -23,6 +23,7 @@ def glob(pattern: str, path: str = ".") -> str:
     Returns:
         JSON string containing list of matching file paths sorted by modification time
     """
+    print(f"called with pattern {pattern} and {path}")
     try:
         search_path = Path(path).resolve()
 
@@ -32,54 +33,12 @@ def glob(pattern: str, path: str = ".") -> str:
                 "files": []
             })
 
-        # Read .gitignore patterns if file exists
-        gitignore_patterns = set()
-        gitignore_path = search_path / ".gitignore"
-        if gitignore_path.exists():
-            try:
-                with open(gitignore_path, 'r') as f:
-                    for line in f:
-                        line = line.strip()
-                        # Skip comments and empty lines
-                        if line and not line.startswith('#'):
-                            gitignore_patterns.add(line)
-            except Exception as e:
-                logger.warning(f"Could not read .gitignore: {e}")
-
-        # Helper function to check if a path matches gitignore patterns
-        def is_ignored(file_path: str) -> bool:
-            rel_path = os.path.relpath(file_path, search_path)
-            for pattern in gitignore_patterns:
-                # Simple pattern matching (handle basic cases)
-                if pattern.endswith('/'):
-                    # Directory pattern
-                    if rel_path.startswith(pattern.rstrip('/')):
-                        return True
-                elif '**' in pattern:
-                    # Recursive pattern
-                    simplified = pattern.replace('**/', '')
-                    if simplified in rel_path:
-                        return True
-                elif pattern.startswith('*.'):
-                    # Extension pattern
-                    if rel_path.endswith(pattern[1:]):
-                        return True
-                else:
-                    # Exact match or directory match
-                    if rel_path == pattern or rel_path.startswith(pattern + '/'):
-                        return True
-            return False
-
         # Use glob to find matching files
         matches = []
         full_pattern = str(search_path / pattern)
 
         for file_path in glob_module.glob(full_pattern, recursive=True):
             if os.path.isfile(file_path):
-                # Skip if matches gitignore pattern
-                if gitignore_patterns and is_ignored(file_path):
-                    continue
-
                 matches.append({
                     "path": file_path,
                     "mtime": os.path.getmtime(file_path)
@@ -124,6 +83,7 @@ def grep(pattern: str, path: str = ".", file_pattern: str = None, case_insensiti
     Returns:
         JSON string containing search results based on output_mode
     """
+    print(f"pattern: {pattern}, case_insensitive: {case_insensitive}")
     try:
         search_path = Path(path).resolve()
 
@@ -154,12 +114,17 @@ def grep(pattern: str, path: str = ".", file_pattern: str = None, case_insensiti
             files_to_search = []
             for root, dirs, files in os.walk(search_path):
                 # Skip common directories
-                dirs[:] = [d for d in dirs if d not in {'.git', 'node_modules', '__pycache__', '.venv', 'venv'}]
+                dirs[:] = [d for d in dirs if d not in {'.git', 'node_modules', '__pycache__', '.venv', 'venv', '.next', 'dist', 'build'}]
                 for file in files:
                     files_to_search.append(os.path.join(root, file))
 
+        # Filter to only code/SQL files
+        allowed_extensions = {'.ts', '.tsx', '.js', '.jsx', '.sql'}
+        files_to_search = [f for f in files_to_search if os.path.splitext(f)[1] in allowed_extensions]
+
         results = []
 
+        print(f"files_to_search: {files_to_search}")
         for file_path in files_to_search:
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:

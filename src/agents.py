@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -9,28 +10,40 @@ from .local_tools import glob, grep, read
 logger = logging.getLogger(__name__)
 
 PROMPT_CODE_PLANNER = """
-You are an AI agent specialized in analyzing TypeScript/JavaScript repositories.
-You have no other purpose but to find analytical queries.
+You are a fast, efficient code analyzer. Find PostgreSQL analytical queries ONLY.
+CRITICAL: The user will provide a repository path. You MUST use that exact path in your tool calls.
 
-<response_style>
-Be concise and direct. Provide structured results without explanatory prose.
-Output only the requested information in the specified format.
-</response_style>
+STRATEGY:
+1. Call grep with these parameters:
+   - pattern="SELECT.*FROM"
+   - path=<the repo path provided by user>
+   - case_insensitive=True
+   - output_mode="content"
+   - show_line_numbers=True
 
-<instruction>
-Search the codebase and identify ALL PostgreSQL analytical queries used for data analysis,
-reporting, or business intelligence purposes.
+   Do NOT use file_pattern since we want to search all text files.
 
-EXCLUDE the following:
-- CRUD operations: INSERT, UPDATE, DELETE
-- Simple SELECT statements fetching single records by ID
-- Schema definitions: CREATE, ALTER, DROP statements
-- Transaction management: BEGIN, COMMIT, ROLLBACK
-- Basic lookups without aggregation or complex logic
-</instruction>
+2. Analyze the grep results directly - DO NOT read full files
+3. Report findings immediately
+
+INCLUDE:
+- Queries with: GROUP BY, COUNT, SUM, AVG, aggregations, DATE_TRUNC, LIMIT, ORDER BY
+- Analytics, reporting, or business intelligence queries
+
+EXCLUDE:
+- INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, BEGIN, COMMIT, ROLLBACK
+- Simple SELECT by ID without aggregation
+
+OUTPUT FORMAT:
+List each query with:
+- File path and line numbers
+- SQL query (abbreviated if long)
+- Brief purpose
+
+Try to use ONE grep call. Be fast.
 """
 
-model_id="us.anthropic.claude-sonnet-4-20250514-v1:0"
+model_id="anthropic.claude-3-5-haiku-20241022-v1:0"
 
 @tool
 def code_planner(repo_path: str) -> str:
@@ -53,14 +66,24 @@ def code_planner(repo_path: str) -> str:
             model=bedrock_model,
             system_prompt=PROMPT_CODE_PLANNER,
             tools=[glob, grep, read],
-            callback_handler=get_callback_handler()
+            callback_handler=get_callback_handler(),
         )
 
+        # Start timer
+        start_time = time.time()
+        logger.info(f"=== CODE PLANNER STARTED ===")
+
         result = str(code_reader_agent(repo_path))
-        logger.info(f"=== CODE READER COMPLETED ===")
+
+        # End timer
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+
+        logger.info(f"=== CODE PLANNER COMPLETED ===")
         logger.info(f"Repository: {repo_path}")
-        logger.info(f"Result length: {len(result)} characters")
-        logger.info(f"Result preview: {result[:500]}{'...' if len(result) > 500 else ''}")
+        logger.info(f"⏱️  Total execution time: {elapsed_time:.2f} seconds ({elapsed_time/60:.2f} minutes)")
+        print(f"\n⏱️  Total execution time: {elapsed_time:.2f} seconds\n")
+
         return result
 
     except Exception as e:
