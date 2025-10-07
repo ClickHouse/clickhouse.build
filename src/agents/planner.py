@@ -1,6 +1,8 @@
 import json
 import logging
 import time
+from datetime import datetime
+from pathlib import Path
 from typing import List
 
 from pydantic import BaseModel, Field
@@ -119,12 +121,24 @@ def agent_planner(repo_path: str) -> str:
         )
         print(f"\n⏱️  Total execution time: {elapsed_time:.2f} seconds\n")
 
+        # Prepare result JSON
         if isinstance(result, QueryAnalysisResult):
-            return result.model_dump_json(indent=2)
+            result_json = result.model_dump_json(indent=2)
         else:
-            return json.dumps(
+            result_json = json.dumps(
                 {"error": "Unexpected result type", "result": str(result)}
             )
+
+        # Write to timestamped file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        plans_dir = Path(repo_path) / ".chbuild" / "plans"
+        plans_dir.mkdir(parents=True, exist_ok=True)
+
+        plan_file = plans_dir / f"plan_{timestamp}.json"
+        plan_file.write_text(result_json)
+        logger.info(f"Plan saved to: {plan_file}")
+
+        return result_json
 
     except Exception as e:
         logger.error(f"Exception in code_reader: {type(e).__name__}: {e}")
