@@ -7,58 +7,9 @@ from pathlib import Path
 
 from strands import tool
 
+from .common import glob, read
+
 logger = logging.getLogger(__name__)
-
-
-@tool
-def glob(pattern: str, path: str = ".") -> str:
-    """
-    Find files matching a glob pattern in the specified directory.
-    Similar to Claude Code's Glob tool for file pattern matching.
-
-    Args:
-        pattern: The glob pattern to match (e.g., "**/*.py", "*.js", "src/**/*.ts")
-        path: The directory to search in (defaults to current directory)
-
-    Returns:
-        JSON string containing list of matching file paths sorted by modification time
-    """
-    print(f"called with pattern {pattern} and {path}")
-    try:
-        search_path = Path(path).resolve()
-
-        if not search_path.exists():
-            return json.dumps({"error": f"Path does not exist: {path}", "files": []})
-
-        # Use glob to find matching files
-        matches = []
-        full_pattern = str(search_path / pattern)
-
-        for file_path in glob_module.glob(full_pattern, recursive=True):
-            if os.path.isfile(file_path):
-                matches.append(
-                    {"path": file_path, "mtime": os.path.getmtime(file_path)}
-                )
-
-        # Sort by modification time (most recent first)
-        matches.sort(key=lambda x: x["mtime"], reverse=True)
-
-        # Return just the paths
-        file_paths = [m["path"] for m in matches]
-
-        return json.dumps(
-            {
-                "pattern": pattern,
-                "search_path": str(search_path),
-                "count": len(file_paths),
-                "files": file_paths,
-            },
-            indent=2,
-        )
-
-    except Exception as e:
-        logger.error(f"Error in glob: {e}")
-        return json.dumps({"error": str(e), "files": []})
 
 
 @tool
@@ -228,63 +179,3 @@ def grep(
     except Exception as e:
         logger.error(f"Error in grep: {e}")
         return json.dumps({"error": str(e), "results": []})
-
-
-@tool
-def read(file_path: str, offset: int = 0, limit: int = None) -> str:
-    """
-    Read the contents of a file with optional line range.
-    Similar to Claude Code's Read tool for file reading.
-
-    Args:
-        file_path: The absolute path to the file to read
-        offset: Line number to start reading from (0-indexed, defaults to 0)
-        limit: Maximum number of lines to read (defaults to all lines)
-
-    Returns:
-        JSON string containing file contents with line numbers (cat -n format)
-    """
-    try:
-        path = Path(file_path).resolve()
-
-        if not path.exists():
-            return json.dumps(
-                {"error": f"File does not exist: {file_path}", "content": ""}
-            )
-
-        if not path.is_file():
-            return json.dumps(
-                {"error": f"Path is not a file: {file_path}", "content": ""}
-            )
-
-        # Read file
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
-            lines = f.readlines()
-
-        # Apply offset and limit
-        if limit:
-            selected_lines = lines[offset : offset + limit]
-        else:
-            selected_lines = lines[offset:]
-
-        # Format with line numbers (cat -n style)
-        formatted_lines = []
-        for i, line in enumerate(selected_lines, start=offset + 1):
-            formatted_lines.append(f"{i:6d}\t{line.rstrip()}")
-
-        content = "\n".join(formatted_lines)
-
-        return json.dumps(
-            {
-                "file": str(path),
-                "total_lines": len(lines),
-                "offset": offset,
-                "lines_returned": len(selected_lines),
-                "content": content,
-            },
-            indent=2,
-        )
-
-    except Exception as e:
-        logger.error(f"Error in read: {e}")
-        return json.dumps({"error": str(e), "content": ""})

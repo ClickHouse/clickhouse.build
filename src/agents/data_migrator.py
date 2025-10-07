@@ -5,9 +5,9 @@ from pathlib import Path
 from strands import Agent
 from strands.models import BedrockModel
 
-from .planner import agent_planner
 from ..tools.data_migrator import data_migrator
 from ..utils import check_aws_credentials
+from .planner import agent_planner
 
 logger = logging.getLogger(__name__)
 
@@ -51,20 +51,20 @@ def get_latest_plan(repo_path: str) -> dict:
     Raises:
         FileNotFoundError: If no plan files exist
     """
-    plans_dir = Path(repo_path) / ".chbuild" / "plans"
+    planner_dir = Path(repo_path) / ".chbuild" / "planner"
 
-    if not plans_dir.exists():
+    if not planner_dir.exists():
         raise FileNotFoundError(
-            f"Plans directory not found at {plans_dir}. "
+            f"Planner directory not found at {planner_dir}. "
             "No plans have been generated yet."
         )
 
     # Find all plan files and sort by name (which sorts by timestamp)
-    plan_files = sorted(plans_dir.glob("plan_*.json"), reverse=True)
+    plan_files = sorted(planner_dir.glob("plan_*.json"), reverse=True)
 
     if not plan_files:
         raise FileNotFoundError(
-            f"No plan files found in {plans_dir}. "
+            f"No plan files found in {planner_dir}. "
             "No plans have been generated yet."
         )
 
@@ -102,7 +102,9 @@ def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> st
             # Now get the plan that was just created
             plan_data = get_latest_plan(repo_path)
 
-        logger.info(f"Loaded plan with {plan_data.get('total_tables', 0)} tables and {plan_data.get('total_queries', 0)} queries")
+        logger.info(
+            f"Loaded plan with {plan_data.get('total_tables', 0)} tables and {plan_data.get('total_queries', 0)} queries"
+        )
 
         bedrock_model = BedrockModel(model_id=model_id)
 

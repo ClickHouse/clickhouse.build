@@ -109,7 +109,9 @@ def compare_configs(expected: Dict, actual: Dict) -> EvalMetrics:
     )
 
 
-def run_single_eval(test_case: Dict, base_path: str, fixtures_dir: Path) -> Dict[str, Any]:
+def run_single_eval(
+    test_case: Dict, base_path: str, fixtures_dir: Path
+) -> Dict[str, Any]:
     """Run evaluation for a single test case"""
     name = test_case["name"]
     repo_path = os.path.join(base_path, test_case["repo_path"])
@@ -135,12 +137,12 @@ def run_single_eval(test_case: Dict, base_path: str, fixtures_dir: Path) -> Dict
         with open(fixture_path, "r") as f:
             plan_data = json.load(f)
 
-        # Create .chbuild/plans directory and place fixture there
-        plans_dir = Path(repo_path) / ".chbuild" / "plans"
-        plans_dir.mkdir(parents=True, exist_ok=True)
+        # Create .chbuild/planner directory and place fixture there
+        planner_dir = Path(repo_path) / ".chbuild" / "planner"
+        planner_dir.mkdir(parents=True, exist_ok=True)
 
         # Write fixture as the "latest" plan
-        plan_file = plans_dir / "plan_fixture.json"
+        plan_file = planner_dir / "plan_fixture.json"
         with open(plan_file, "w") as f:
             json.dump(plan_data, f, indent=2)
 
@@ -204,7 +206,9 @@ def run_single_eval(test_case: Dict, base_path: str, fixtures_dir: Path) -> Dict
             try:
                 actual_config = extract_config_from_curl(actual["command"])
                 actual_db = actual_config["source"]["postgres"]["database"]
-                print(f"   Database: expected '{expected['database_name']}', got '{actual_db}'")
+                print(
+                    f"   Database: expected '{expected['database_name']}', got '{actual_db}'"
+                )
             except:
                 pass
         if not metrics.table_mappings_correct:

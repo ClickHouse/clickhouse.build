@@ -132,10 +132,10 @@ def agent_planner(repo_path: str) -> str:
 
         # Write to timestamped file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        plans_dir = Path(repo_path) / ".chbuild" / "plans"
-        plans_dir.mkdir(parents=True, exist_ok=True)
+        planner_dir = Path(repo_path) / ".chbuild" / "planner"
+        planner_dir.mkdir(parents=True, exist_ok=True)
 
-        plan_file = plans_dir / f"plan_{timestamp}.json"
+        plan_file = planner_dir / f"plan_{timestamp}.json"
         plan_file.write_text(result_json)
         logger.info(f"Plan saved to: {plan_file}")
 
