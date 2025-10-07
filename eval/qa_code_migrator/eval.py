@@ -13,7 +13,7 @@ from typing import Any, Dict
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.tools.qa_code_migrator import qa_approve
+from src.agents.qa_code_migrator import qa_approve
 from src.utils import check_aws_credentials
 
 # Configure logging

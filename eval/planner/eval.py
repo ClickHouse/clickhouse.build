@@ -10,7 +10,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -38,41 +38,73 @@ class EvalMetrics:
     total_found: int
 
 
-def normalize_location(location: str) -> str:
-    """Normalize location to file:start_line format for comparison"""
-    # Keep file path and starting line number
-    if ":L" in location:
-        parts = location.split(":L")
-        if len(parts) == 2:
-            file_path = parts[0]
-            # Extract just the starting line number (before any dash or comma)
-            line_part = parts[1].split("-")[0].split(",")[0]
-            return f"{file_path}:L{line_part}"
-    return location
+def paths_match(path1: str, path2: str) -> bool:
+    """Check if two paths match, handling absolute vs relative paths"""
+    # Normalize separators
+    path1 = path1.replace("\\", "/")
+    path2 = path2.replace("\\", "/")
+
+    # If paths are exactly equal
+    if path1 == path2:
+        return True
+
+    # Check if one path ends with the other (handles absolute vs relative)
+    # This handles cases where one path is /full/path/to/app/file.ts
+    # and the other is /app/file.ts
+    return path1.endswith(path2) or path2.endswith(path1)
 
 
-def are_locations_similar(loc1: str, loc2: str, line_tolerance: int = 3) -> bool:
-    """Check if two locations are similar (same file, within N lines)"""
-    norm1 = normalize_location(loc1)
-    norm2 = normalize_location(loc2)
+def extract_line_range(location: str) -> tuple:
+    """Extract file path and line range from location string"""
+    if ":L" not in location:
+        return None, None, None
 
-    # Extract file path and line number
-    try:
-        file1, line1_str = norm1.rsplit(":L", 1)
-        file2, line2_str = norm2.rsplit(":L", 1)
+    parts = location.split(":L")
+    if len(parts) != 2:
+        return None, None, None
 
-        # Check if same file
-        if file1 != file2:
-            return False
+    file_path = parts[0]
+    line_part = parts[1]
 
-        # Check if lines are within tolerance
-        line1 = int(line1_str)
-        line2 = int(line2_str)
+    # Parse line range (e.g., "27-30" or "27")
+    if "-" in line_part:
+        start, end = line_part.split("-", 1)
+        return file_path, int(start), int(end)
+    else:
+        line = int(line_part)
+        return file_path, line, line
 
-        return abs(line1 - line2) <= line_tolerance
-    except (ValueError, AttributeError):
-        # Fallback to exact match
-        return norm1 == norm2
+
+def calculate_line_overlap(loc1: str, loc2: str) -> float:
+    """Calculate the overlap ratio between two line ranges (0.0 to 1.0)"""
+    file1, start1, end1 = extract_line_range(loc1)
+    file2, start2, end2 = extract_line_range(loc2)
+
+    if file1 is None or file2 is None:
+        return 0.0
+
+    # Check if same file (handles absolute vs relative paths)
+    if not paths_match(file1, file2):
+        return 0.0
+
+    # Calculate overlap
+    overlap_start = max(start1, start2)
+    overlap_end = min(end1, end2)
+    overlap = max(0, overlap_end - overlap_start + 1)
+
+    # Calculate union
+    union_start = min(start1, start2)
+    union_end = max(end1, end2)
+    union = union_end - union_start + 1
+
+    # Return IoU (Intersection over Union)
+    return overlap / union if union > 0 else 0.0
+
+
+def are_locations_similar(loc1: str, loc2: str, overlap_threshold: float = 0.5) -> bool:
+    """Check if two locations are similar based on line range overlap"""
+    overlap = calculate_line_overlap(loc1, loc2)
+    return overlap >= overlap_threshold
 
 
 def calculate_metrics(expected: Dict, actual: Dict) -> EvalMetrics:

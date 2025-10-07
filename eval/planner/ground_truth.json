@@ -72,22 +72,22 @@
         "queries": [
           {
             "description": "Total expenses aggregation",
-            "location": "/app/api/expenses/stats/route.ts:L27-32",
+            "location": "/app/api/expenses/stats/route.ts:L21-25",
             "query_type": "orm"
           },
           {
             "description": "Category aggregation",
-            "location": "/app/api/expenses/stats/route.ts:L36-46",
+            "location": "/app/api/expenses/stats/route.ts:L28-34",
             "query_type": "orm"
           },
           {
             "description": "Monthly aggregation",
-            "location": "/app/api/expenses/stats/route.ts:L50-60",
+            "location": "/app/api/expenses/stats/route.ts:L37-60",
             "query_type": "orm"
           },
           {
             "description": "Daily aggregation",
-            "location": "/app/api/expenses/stats/route.ts:L64-74",
+            "location": "/app/api/expenses/stats/route.ts:L69-76",
             "query_type": "orm"
           }
         ]
