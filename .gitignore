@@ -12,7 +12,11 @@ logs/
 .chbuild/
 test/umami/
 test/cal.com/
+test/dub/
 test/formbricks/
-test/analytics/
 test/HouseClick/
+test/plane/
+test/rallly/
+test/twenty/
+
 eval_results.json
