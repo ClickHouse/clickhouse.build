@@ -14,10 +14,23 @@ from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """
+
+def get_system_prompt(agents_md_content: str = "") -> str:
+    """Build the system prompt with optional AGENTS.md content injected."""
+    additional_instructions = ""
+    if agents_md_content:
+        additional_instructions = f"""
+<additional_agent_instructions source="AGENTS.md">
+{agents_md_content}
+</additional_agent_instructions>
+
+"""
+
+    return f"""
 You are a code migration assistant helping developers add ClickHouse to their application.
 
 Your job is to install the ClickHouse client library and understand the application's data structure. Follow these steps:
+{additional_instructions}
 
 1. **Read the latest plan**
    - Use glob to find plan files in .chbuild/planner/plan_*.json
@@ -101,6 +114,7 @@ IMPORTANT:
 - Return your final result as valid JSON
 """
 
+
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
@@ -123,12 +137,22 @@ def agent_code_migrator(repo_path: str) -> str:
 
     bedrock_model = BedrockModel(model_id=model_id)
 
+    # Read AGENTS.md if it exists
+    agents_md_content = ""
+    agents_md_path = Path(repo_path) / "AGENTS.md"
+    if agents_md_path.exists():
+        try:
+            agents_md_content = agents_md_path.read_text()
+            logger.info("Found AGENTS.md in repository")
+        except Exception as e:
+            logger.warning(f"Failed to read AGENTS.md: {e}")
+
     try:
         start_time = time.time()
 
         agent = Agent(
             model=bedrock_model,
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=get_system_prompt(agents_md_content),
             tools=[glob, read, bash_run, qa_approve, file_write],
             callback_handler=get_callback_handler(),
         )

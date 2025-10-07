@@ -14,11 +14,22 @@ from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
 
-PROMPT_CODE_PLANNER = f"""
 
+def get_system_prompt(agents_md_content: str = "") -> str:
+    """Build the system prompt with optional AGENTS.md content injected."""
+    additional_instructions = ""
+    if agents_md_content:
+        additional_instructions = f"""
+<additional_agent_instructions source="AGENTS.md">
+{agents_md_content}
+</additional_agent_instructions>
+
+"""
+
+    return f"""
 You are a fast, efficient code analyzer. Find PostgreSQL analytical queries ONLY.
 Queries may be raw SQL strings OR ORM queries (Prisma, DrizzleORM, TypeORM, etc).
-
+{additional_instructions}
 STRATEGY:
 1. Search for analytical queries using a single grep call with combined pattern: grep with pattern="(SELECT.*FROM|count\\(|sum\\(|avg\\(|groupBy|DATE_TRUNC)", case_insensitive=True, output_mode="content", show_line_numbers=True
 2. Analyze results and identify ONLY analytical queries (with aggregations, GROUP BY, etc.)
@@ -51,6 +62,7 @@ You will return structured JSON with:
   - code: The actual SQL or ORM query code
   - location: File path with line numbers (e.g., /app/api/route.ts:L60-65)
 """
+
 
 # model_id="anthropic.claude-3-5-haiku-20241022-v1:0"
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
@@ -87,10 +99,20 @@ def agent_planner(repo_path: str) -> str:
 
     bedrock_model = BedrockModel(model_id=model_id)
 
+    # Read AGENTS.md if it exists
+    agents_md_content = ""
+    agents_md_path = Path(repo_path) / "AGENTS.md"
+    if agents_md_path.exists():
+        try:
+            agents_md_content = agents_md_path.read_text()
+            logger.info("Found AGENTS.md in repository")
+        except Exception as e:
+            logger.warning(f"Failed to read AGENTS.md: {e}")
+
     try:
         analysis_agent = Agent(
             model=bedrock_model,
-            system_prompt=PROMPT_CODE_PLANNER,
+            system_prompt=get_system_prompt(agents_md_content),
             tools=[glob, grep, read],
             callback_handler=get_callback_handler(),
         )
