@@ -14,7 +14,8 @@ from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
 
-PROMPT_CODE_PLANNER = """
+PROMPT_CODE_PLANNER = f"""
+
 You are a fast, efficient code analyzer. Find PostgreSQL analytical queries ONLY.
 Queries may be raw SQL strings OR ORM queries (Prisma, DrizzleORM, TypeORM, etc).
 
