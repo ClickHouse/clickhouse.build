@@ -108,6 +108,19 @@ Your job is to install the ClickHouse client library and understand the applicat
      }}
 
 IMPORTANT:
+- Make sure the clickhouse client is properly configured. This can be used as a template:
+
+```
+createClient({{
+  url: `https://${{process.env.CLICKHOUSE_HOST}}` || 'http://localhost:8123',
+  username: process.env.CLICKHOUSE_USER || 'default',
+  password: process.env.CLICKHOUSE_PASSWORD || '',
+  database: process.env.CLICKHOUSE_DATABASE || 'default',
+}});
+```
+
+- Add a log statement to let the user know what strategy they are using (postgres vs clickhouse)
+- Every so often, build the project and ensure it is building with no type errors
 - Use the exact repo path provided for all tool calls
 - NEVER use any or unknown types in generated code
 - Use file_write tool to write/update files

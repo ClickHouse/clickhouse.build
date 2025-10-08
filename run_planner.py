@@ -32,7 +32,7 @@ def main():
     print("✓ AWS credentials found and valid\n")
 
     # Define the repository path
-    repo_path = os.path.join(os.path.dirname(__file__), "test", "pg-expense-direct")
+    repo_path = os.path.join(os.path.dirname(__file__), "test", "pg-expense-prisma")
 
     if not os.path.exists(repo_path):
         print(f"Error: Repository path does not exist: {repo_path}")

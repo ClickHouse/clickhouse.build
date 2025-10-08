@@ -1,6 +1,7 @@
 import json
 import logging
 
+from strands import Agent
 from strands import tool
 from strands.models import BedrockModel
 
@@ -86,9 +87,6 @@ Validate and return JSON with approval decision and reason.
 """
 
         logger.info(f"QA reviewing code for: {file_path}")
-
-        # Simple agent call without tools
-        from strands import Agent
 
         qa_agent = Agent(
             model=bedrock_model,
