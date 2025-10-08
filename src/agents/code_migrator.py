@@ -8,8 +8,8 @@ from strands import Agent, tool
 from strands.models import BedrockModel
 from strands_tools import file_write
 
-from ..tools.common import bash_run, glob, read
 from ..agents.qa_code_migrator import qa_approve
+from ..tools.common import bash_run, call_human, glob, read
 from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
@@ -120,11 +120,13 @@ createClient({{
 ```
 
 - Add a log statement to let the user know what strategy they are using (postgres vs clickhouse)
-- Every so often, build the project and ensure it is building with no type errors
+- Every so often, build the project and ensure it is building with no type errors. If it fails, do it more frequently until it starts to pass again.
 - Use the exact repo path provided for all tool calls
 - NEVER use any or unknown types in generated code
 - Use file_write tool to write/update files
 - Return your final result as valid JSON
+- If you need guidence then call the call_human tool
+- When you are finished, call the call_human tool to inform you are complete, and they should test and give feedback
 """
 
 
@@ -174,7 +176,7 @@ def agent_code_migrator(repo_path: str) -> str:
         agent = Agent(
             model=bedrock_model,
             system_prompt=get_system_prompt(agents_md_content),
-            tools=[glob, read, bash_run, qa_approve, file_write],
+            tools=[glob, read, bash_run, qa_approve, file_write, call_human],
             callback_handler=get_callback_handler(),
         )
 

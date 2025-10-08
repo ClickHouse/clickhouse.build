@@ -1,8 +1,7 @@
 import json
 import logging
 
-from strands import Agent
-from strands import tool
+from strands import Agent, tool
 from strands.models import BedrockModel
 
 logger = logging.getLogger(__name__)

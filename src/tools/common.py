@@ -220,3 +220,24 @@ def bash_run(command: str, working_dir: str = ".") -> str:
         return json.dumps(
             {"error": str(e), "exit_code": -1, "stdout": "", "stderr": ""}
         )
+
+
+@tool
+def call_human(prompt: str) -> str:
+    """
+    Request input from the user during agent execution.
+    Use this tool when you need clarification, guidance, or approval from the user.
+
+    Args:
+        prompt: The question or message to present to the user
+
+    Returns:
+        The user's response as a string
+    """
+    print(f"\n{'='*60}")
+    print(f"AGENT REQUEST FOR INPUT:")
+    print(f"{prompt}")
+    print(f"{'='*60}\n")
+
+    user_input = input("Your response: ")
+    return user_input
