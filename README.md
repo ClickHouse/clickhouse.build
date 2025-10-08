@@ -7,4 +7,3 @@ PostgreSQL to ClickHouse migration tool using AI agents.
 
   - [ ] Check that these are not MySQL queries etc - try get postgres context
   - [ ] Check planning agent aren't rewriting queries when scanning
-t

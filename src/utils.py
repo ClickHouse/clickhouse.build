@@ -26,8 +26,7 @@ def check_aws_credentials():
     """
     try:
         import boto3
-        from botocore.exceptions import (NoCredentialsError,
-                                         PartialCredentialsError)
+        from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 
         # Try to create a session and get credentials
         session = boto3.Session()

@@ -9,7 +9,7 @@ from strands.models import BedrockModel
 from strands_tools import file_write
 
 from ..tools.common import bash_run, glob, read
-from ..tools.qa_code_migrator import qa_approve
+from ..agents.qa_code_migrator import qa_approve
 from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
@@ -35,10 +35,10 @@ Your job is to install the ClickHouse client library and understand the applicat
 1. **Read the latest plan**
    - Use glob to find plan files in .chbuild/planner/plan_*.json
    - If NO plan files exist, immediately return this JSON and STOP:
-     {
+     {{
        "error": "No plan found. Please run the planner first to analyze your queries.",
        "plan_found": false
-     }
+     }}
    - If plan files exist, read the most recent plan file (sorted by filename)
    - Understand what tables and queries exist in the application
 
@@ -75,7 +75,7 @@ Your job is to install the ClickHouse client library and understand the applicat
    - For EACH file you want to create or modify:
      a) Generate the code content
      b) Call qa_approve tool with: file_path, code_content, and purpose
-     c) The qa_approve tool returns: {"approved": boolean, "reason": string}
+     c) The qa_approve tool returns: {{"approved": boolean, "reason": string}}
      d) If approved=true: proceed with file_write
      e) If approved=false: revise the code based on the reason and try qa_approve again
      f) Do NOT use file_write without qa_approve approval
@@ -84,28 +84,28 @@ Your job is to install the ClickHouse client library and understand the applicat
    - Ensure all code maintains backwards compatibility
    - Ensure strict TypeScript typing throughout (no any/unknown)
    - Return a JSON object with:
-     {
+     {{
        "plan_found": true,
        "tables": [...list from plan...],
        "package_manager": "...",
        "installed": true/false,
        "version": "...",
-       "strategy": {
+       "strategy": {{
          "pattern": "description of the strategy pattern approach",
-         "query_sites": [...list of {file, location, query_type} objects...],
+         "query_sites": [...list of {{file, location, query_type}} objects...],
          "total_query_sites": number,
          "environment_variable": "USE_CLICKHOUSE",
          "environment_sources": [".env file", "system environment"],
          "backwards_compatible": true,
          "strict_typing": true
-       },
-       "implementation": {
+       }},
+       "implementation": {{
          "files_created": [...list of new files...],
          "files_modified": [...list of modified files...],
          "total_changes": number,
          "status": "completed"
-       }
-     }
+       }}
+     }}
 
 IMPORTANT:
 - Use the exact repo path provided for all tool calls
@@ -135,7 +135,15 @@ def agent_code_migrator(repo_path: str) -> str:
     if not creds_available:
         return f"Error: {error_message}"
 
-    bedrock_model = BedrockModel(model_id=model_id)
+    bedrock_model = BedrockModel(
+        model_id=model_id,
+        max_tokens=16_000,
+        temperature=1,
+        additional_request_fields={
+            "anthropic_beta": ["interleaved-thinking-2025-05-14"],
+            "reasoning_config": {"type": "enabled", "budget_tokens": 10_000},
+        },
+    )
 
     # Read AGENTS.md if it exists
     agents_md_content = ""
@@ -176,7 +184,7 @@ def agent_code_migrator(repo_path: str) -> str:
         migrator_dir = Path(repo_path) / ".chbuild" / "migrator" / "code"
         migrator_dir.mkdir(parents=True, exist_ok=True)
 
-        plan_file = migrator_dir / f"plan_{timestamp}.json"
+        plan_file = Path(repo_path) / ".chbuild" / "planner" / f"plan_{timestamp}.json"
 
         # Try to parse result as JSON, otherwise wrap it
         try:
