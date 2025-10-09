@@ -50,6 +50,7 @@ def agent_planner(repo_path: str) -> str:
 
     try:
         analysis_agent = Agent(
+            name="planner",
             model=bedrock_model,
             system_prompt=get_system_prompt(repo_path),
             tools=[glob, grep, read],

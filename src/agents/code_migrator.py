@@ -49,6 +49,7 @@ def agent_code_migrator(repo_path: str) -> str:
         start_time = time.time()
 
         agent = Agent(
+            name="code_migrator",
             model=bedrock_model,
             system_prompt=get_system_prompt(repo_path),
             tools=[grep, glob, read, bash_run, qa_approve, file_write, call_human],

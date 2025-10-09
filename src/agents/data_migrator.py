@@ -86,6 +86,7 @@ def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> st
         bedrock_model = BedrockModel(model_id=model_id)
 
         agent = Agent(
+            name="data_migrator",
             model=bedrock_model,
             system_prompt=get_system_prompt(repo_path),
             tools=[data_migrator],

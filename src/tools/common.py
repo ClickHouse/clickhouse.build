@@ -9,6 +9,18 @@ from strands import tool
 
 logger = logging.getLogger(__name__)
 
+# Directories to exclude from glob and grep searches
+EXCLUDED_DIRS = {
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".next",
+    "dist",
+    "build",
+}
+
 
 @tool
 def glob(pattern: str, path: str = ".") -> str:
@@ -36,9 +48,12 @@ def glob(pattern: str, path: str = ".") -> str:
 
         for file_path in glob_module.glob(full_pattern, recursive=True):
             if os.path.isfile(file_path):
-                matches.append(
-                    {"path": file_path, "mtime": os.path.getmtime(file_path)}
-                )
+                # Check if file is in an excluded directory
+                path_parts = Path(file_path).relative_to(search_path).parts
+                if not any(part in EXCLUDED_DIRS for part in path_parts):
+                    matches.append(
+                        {"path": file_path, "mtime": os.path.getmtime(file_path)}
+                    )
 
         # Sort by modification time (most recent first)
         matches.sort(key=lambda x: x["mtime"], reverse=True)
@@ -269,7 +284,6 @@ def grep(
     Returns:
         JSON string containing search results based on output_mode
     """
-    print(f"pattern: {pattern}, case_insensitive: {case_insensitive}")
     try:
         import re
 
@@ -297,22 +311,8 @@ def grep(
             # Search all files recursively
             files_to_search = []
             for root, dirs, files in os.walk(search_path):
-                # Skip common directories
-                dirs[:] = [
-                    d
-                    for d in dirs
-                    if d
-                    not in {
-                        ".git",
-                        "node_modules",
-                        "__pycache__",
-                        ".venv",
-                        "venv",
-                        ".next",
-                        "dist",
-                        "build",
-                    }
-                ]
+                # Skip excluded directories
+                dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
                 for file in files:
                     files_to_search.append(os.path.join(root, file))
 
@@ -324,7 +324,6 @@ def grep(
 
         results = []
 
-        print(f"files_to_search: {files_to_search}")
         for file_path in files_to_search:
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
