@@ -9,68 +9,18 @@ from pydantic import BaseModel, Field
 from strands import Agent, tool
 from strands.models import BedrockModel
 
-from ..tools.planner import glob, grep, read
+from ..prompts.planner import get_system_prompt
+from ..tools.common import glob, grep, read
 from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
 
 
-def get_system_prompt(agents_md_content: str = "") -> str:
-    """Build the system prompt with optional AGENTS.md content injected."""
-    additional_instructions = ""
-    if agents_md_content:
-        additional_instructions = f"""
-<additional_agent_instructions source="AGENTS.md">
-{agents_md_content}
-</additional_agent_instructions>
-
-"""
-
-    return f"""
-You are a fast, efficient code analyzer. Find PostgreSQL analytical queries ONLY.
-Queries may be raw SQL strings OR ORM queries (Prisma, DrizzleORM, TypeORM, etc).
-{additional_instructions}
-STRATEGY:
-1. Search for analytical queries using a single grep call with combined pattern: grep with pattern="(SELECT.*FROM|count\\(|sum\\(|avg\\(|groupBy|DATE_TRUNC)", case_insensitive=True, output_mode="content", show_line_numbers=True
-2. Analyze results and identify ONLY analytical queries (with aggregations, GROUP BY, etc.)
-
-IMPORTANT: Use the exact repo path provided in the `path` parameter for ALL grep calls.
-
-INCLUDE (these are ALL analytical queries):
-- ANY query with COUNT(), SUM(), AVG(), MAX(), MIN() - even without GROUP BY
-- Queries with: GROUP BY, DATE_TRUNC, aggregations
-- Analytics, reporting, or business intelligence queries
-- ORM queries that do aggregations (.count(), .sum(), .avg(), .groupBy(), etc.)
-
-EXCLUDE:
-- INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, BEGIN, COMMIT, ROLLBACK
-- Simple SELECT * or SELECT by ID WITHOUT any aggregation functions
-- Simple lookups or CRUD operations without COUNT/SUM/AVG
-- Queries in directories: /scripts/, /migrations/, /test/, /tests/, /__tests__/
-- Any utility or scratch code
-
-IMPORTANT: Report EVERY analytical query you find. Do not skip any. Do not duplicate any queries
-Be fast. Do not make suggestions or ask follow ups. Only produce the output format:
-
-OUTPUT FORMAT:
-You will return structured JSON with:
-- tables: List of all database tables found in the queries
-- total_tables: The count of unique database tables (should equal length of tables array)
-- total_queries: The total count of analytical queries found (should equal length of queries array)
-- queries: Array of query objects, each containing:
-  - description: Brief description of what the query does
-  - code: The actual SQL or ORM query code
-  - location: File path with line numbers (e.g., /app/api/route.ts:L60-65)
-"""
-
-
-# model_id="anthropic.claude-3-5-haiku-20241022-v1:0"
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
 class AnalyticalQuery(BaseModel):
     """Represents a single analytical SQL query found in the codebase"""
-
     description: str = Field(description="Brief description of what the query does")
     code: str = Field(description="The SQL query code or ORM query code")
     location: str = Field(
@@ -80,7 +30,6 @@ class AnalyticalQuery(BaseModel):
 
 class QueryAnalysisResult(BaseModel):
     """Result of analyzing a codebase for analytical queries"""
-
     tables: List[str] = Field(description="List of database tables used in the queries")
     total_tables: int = Field(description="The number of database tables found")
     total_queries: int = Field(description="The number of analytical queries found")
@@ -99,20 +48,10 @@ def agent_planner(repo_path: str) -> str:
 
     bedrock_model = BedrockModel(model_id=model_id)
 
-    # Read AGENTS.md if it exists
-    agents_md_content = ""
-    agents_md_path = Path(repo_path) / "AGENTS.md"
-    if agents_md_path.exists():
-        try:
-            agents_md_content = agents_md_path.read_text()
-            logger.info("Found AGENTS.md in repository")
-        except Exception as e:
-            logger.warning(f"Failed to read AGENTS.md: {e}")
-
     try:
         analysis_agent = Agent(
             model=bedrock_model,
-            system_prompt=get_system_prompt(agents_md_content),
+            system_prompt=get_system_prompt(repo_path),
             tools=[glob, grep, read],
             callback_handler=get_callback_handler(),
         )
@@ -152,7 +91,6 @@ def agent_planner(repo_path: str) -> str:
                 {"error": "Unexpected result type", "result": str(result)}
             )
 
-        # Write to timestamped file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         planner_dir = Path(repo_path) / ".chbuild" / "planner"
         planner_dir.mkdir(parents=True, exist_ok=True)
