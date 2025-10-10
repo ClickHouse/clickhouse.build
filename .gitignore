@@ -10,13 +10,6 @@ test/pg-expense-prisma/node_modules/
 logs/
 .claude/
 .chbuild/
-test/umami/
-test/cal.com/
-test/dub/
-test/formbricks/
-test/HouseClick/
-test/plane/
-test/rallly/
-test/twenty/
+test/external
 
 eval_results.json

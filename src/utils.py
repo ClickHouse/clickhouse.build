@@ -3,8 +3,8 @@ import os
 from typing import Any
 
 import boto3
-from botocore.exceptions import (NoCredentialsError,
-                                  PartialCredentialsError)
+from botocore.exceptions import NoCredentialsError, PartialCredentialsError
+
 
 class PrintingCallbackHandler:
     """Handler for streaming text output and tool invocations to stdout."""
@@ -66,7 +66,9 @@ class PrintingCallbackHandler:
                     agent_name = "unknown"
                     if agent:
                         # Try to get the agent's name or class name
-                        agent_name = getattr(agent, 'name', None) or agent.__class__.__name__
+                        agent_name = (
+                            getattr(agent, "name", None) or agent.__class__.__name__
+                        )
 
                     input_parts = []
                     for key, value in parsed_input.items():
@@ -79,9 +81,13 @@ class PrintingCallbackHandler:
 
                     if input_parts:
                         input_str = ", ".join(input_parts)
-                        print(f"\n\n🌕 [{agent_name}] Tool({self.tool_count}): {tool_name}({input_str})\n")
+                        print(
+                            f"\n\n🌕 [{agent_name}] Tool({self.tool_count}): {tool_name}({input_str})\n"
+                        )
                     else:
-                        print(f"\n\n🌕 [{agent_name}] Tool({self.tool_count}): {tool_name}()\n")
+                        print(
+                            f"\n\n🌕 [{agent_name}] Tool({self.tool_count}): {tool_name}()\n"
+                        )
 
         if complete and data:
             print("\n")

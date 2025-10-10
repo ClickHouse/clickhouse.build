@@ -259,6 +259,62 @@ def call_human(prompt: str) -> str:
 
 
 @tool
+def load_example(orm_type: str = "orm_none") -> str:
+    """
+    Load an example from the corpus based on the ORM type.
+
+    Args:
+        orm_type: The ORM type to load examples for. Options:
+                  - "orm_none" (default): Plain SQL queries without ORM
+                  - "orm_drizzleorm": Drizzle ORM examples
+                  - "orm_prisma": Prisma ORM examples (future)
+
+    Returns:
+        JSON string containing the corpus content and metadata
+    """
+    try:
+        current_dir = Path(__file__).parent.parent
+        corpus_dir = current_dir / "corpus"
+
+        corpus_file = corpus_dir / f"{orm_type}.txt"
+
+        if not corpus_file.exists():
+            available_files = list(corpus_dir.glob("*.txt"))
+            available_orms = [f.stem for f in available_files]
+
+            return json.dumps({
+                "error": f"Corpus file not found for ORM type: {orm_type}",
+                "available_orm_types": available_orms,
+                "content": ""
+            }, indent=2)
+
+        # Read the corpus file
+        with open(corpus_file, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Calculate some metadata
+        file_sections = content.count("<file")
+        evaluation_sections = content.count("<EVALUATION>")
+
+        return json.dumps({
+            "orm_type": orm_type,
+            "corpus_file": str(corpus_file),
+            "file_size_bytes": corpus_file.stat().st_size,
+            "content_length": len(content),
+            "file_sections": file_sections,
+            "evaluation_sections": evaluation_sections,
+            "content": content
+        }, indent=2)
+
+    except Exception as e:
+        logger.error(f"Error loading corpus example: {e}")
+        return json.dumps({
+            "error": str(e),
+            "content": ""
+        })
+
+
+@tool
 def grep(
     pattern: str,
     path: str = ".",
@@ -411,3 +467,4 @@ def grep(
     except Exception as e:
         logger.error(f"Error in grep: {e}")
         return json.dumps({"error": str(e), "results": []})
+

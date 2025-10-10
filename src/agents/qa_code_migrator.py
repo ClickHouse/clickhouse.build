@@ -88,7 +88,7 @@ Validate and return JSON with approval decision and reason.
         logger.info(f"QA reviewing code for: {file_path}")
 
         qa_agent = Agent(
-            name="qa_code_migrator"
+            name="qa_code_migrator",
             model=bedrock_model,
             system_prompt=QA_SYSTEM_PROMPT,
             tools=[],

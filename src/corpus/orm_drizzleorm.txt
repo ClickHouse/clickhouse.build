@@ -1,0 +1,726 @@
+<EVALUATION type="expert">
+  <score>5/5</score>
+
+	<comment>
+		This is a very good port of drizzle analytical queries being ported.
+		The OLTP queries were not ported as expected.
+		The agent created a clean and backward compatible abstraction.
+		It did minimal changes and used strong types.
+		This can be used as a high level inspiration for the codebase you are about to migrate
+	</comment>
+</EVALUATION>
+
+<file type="diff" modified="true">
+	diff --git a/test/pg-expense-drizzleorm/app/api/expenses/route.ts b/test/pg-expense-drizzleorm/app/api/expenses/route.ts
+	index 60d6a57..b246155 100644
+	--- a/test/pg-expense-drizzleorm/app/api/expenses/route.ts
+	+++ b/test/pg-expense-drizzleorm/app/api/expenses/route.ts
+	@@ -1,7 +1,7 @@
+	import { NextRequest, NextResponse } from 'next/server';
+	-import { db } from '@/lib/db';
+	+import { db, dbStrategy } from '@/lib/db';
+	import { expenses } from '@/lib/schema';
+	-import { and, gte, lte, eq, desc } from 'drizzle-orm';
+	+import { QueryParams } from '@/lib/types';
+
+	export async function POST(request: NextRequest) {
+		try {
+	@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
+				);
+			}
+
+	+    // OLTP operations always use PostgreSQL via Drizzle ORM
+			const result = await db.insert(expenses).values({
+				description,
+				amount: parseFloat(amount).toString(),
+	@@ -32,34 +33,32 @@ export async function POST(request: NextRequest) {
+	}
+
+	export async function GET(request: NextRequest) {
+	+  const { searchParams } = new URL(request.url);
+	+  const startDate = searchParams.get('startDate');
+	+  const endDate = searchParams.get('endDate');
+	+  const category = searchParams.get('category');
+	+
+	+  const filter: QueryParams = {
+	+    startDate: startDate || undefined,
+	+    endDate: endDate || undefined,
+	+    category: category || undefined
+	+  };
+	+
+		try {
+	-    const { searchParams } = new URL(request.url);
+	-    const startDate = searchParams.get('startDate');
+	-    const endDate = searchParams.get('endDate');
+	-    const category = searchParams.get('category');
+	-
+	-    const conditions = [];
+	-
+	-    if (startDate) {
+	-      conditions.push(gte(expenses.date, startDate));
+	-    }
+	-
+	-    if (endDate) {
+	-      conditions.push(lte(expenses.date, endDate));
+	-    }
+	-
+	-    if (category) {
+	-      conditions.push(eq(expenses.category, category));
+	-    }
+	-
+	-    const result = await db.select()
+	-      .from(expenses)
+	-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+	-      .orderBy(desc(expenses.date), desc(expenses.createdAt));
+	-
+	-    return NextResponse.json(result);
+	+    // Use strategy pattern for querying expenses (OLAP)
+	+    const expenses = await dbStrategy.getAllExpenses(filter);
+	+    return NextResponse.json(expenses);
+		} catch (error) {
+			console.error('Error fetching expenses:', error);
+	+
+	+    // Enhanced error reporting for ClickHouse issues
+	+    if (process.env.USE_CLICKHOUSE === 'true') {
+	+      console.error('ClickHouse query error details:', {
+	+        filter,
+	+        error: error instanceof Error ? error.message : 'Unknown error'
+	+      });
+	+    }
+	+
+			return NextResponse.json(
+				{ error: 'Internal server error' },
+				{ status: 500 }
+	(END)
+</file>
+
+<file type="diff" modified="true">
+	diff --git a/test/pg-expense-drizzleorm/app/api/expenses/stats/route.ts b/test/pg-expense-drizzleorm/app/api/expenses/stats/route.ts
+	index 7e042a8..e39fadd 100644
+	--- a/test/pg-expense-drizzleorm/app/api/expenses/stats/route.ts
+	+++ b/test/pg-expense-drizzleorm/app/api/expenses/stats/route.ts
+	@@ -1,7 +1,6 @@
+	import { NextRequest, NextResponse } from 'next/server';
+	-import { db } from '@/lib/db';
+	-import { expenses } from '@/lib/schema';
+	-import { and, gte, lte, count, sum, desc, sql } from 'drizzle-orm';
+	+import { dbStrategy } from '@/lib/db';
+	+import { DateFilter, ExpenseStats } from '@/lib/types';
+
+	export async function GET(request: NextRequest) {
+		try {
+	@@ -9,85 +8,37 @@ export async function GET(request: NextRequest) {
+			const startDate = searchParams.get('startDate');
+			const endDate = searchParams.get('endDate');
+
+	-    const conditions = [];
+	-
+	-    if (startDate) {
+	-      conditions.push(gte(expenses.date, startDate));
+	-    }
+	-
+	-    if (endDate) {
+	-      conditions.push(lte(expenses.date, endDate));
+	-    }
+	-
+	-    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+	-
+	-    // Total expenses
+	-    const totalResult = await db.select({
+	-      count: count(),
+	-      total: sum(expenses.amount)
+	-    })
+	-    .from(expenses)
+	-    .where(whereCondition);
+	-
+	-    // Expenses by category
+	-    const categoryResult = await db.select({
+	-      category: sql<string>`COALESCE(${expenses.category}, 'Uncategorized')`,
+	-      count: count(),
+	-      total: sum(expenses.amount)
+	-    })
+	-    .from(expenses)
+	-    .where(whereCondition)
+	-    .groupBy(sql`COALESCE(${expenses.category}, 'Uncategorized')`)
+	-    .orderBy(desc(sum(expenses.amount)));
+	-
+	-    // Monthly aggregation
+	-    const monthlyResult = await db.select({
+	-      month: sql<Date>`DATE_TRUNC('month', ${expenses.date})`,
+	-      count: count(),
+	-      total: sum(expenses.amount)
+	-    })
+	-    .from(expenses)
+	-    .where(whereCondition)
+	-    .groupBy(sql`DATE_TRUNC('month', ${expenses.date})`)
+	-    .orderBy(desc(sql`DATE_TRUNC('month', ${expenses.date})`));
+	-
+	-    // Daily aggregation for last 30 days (or filtered range)
+	-    const dailyResult = await db.select({
+	-      date: expenses.date,
+	-      count: count(),
+	-      total: sum(expenses.amount)
+	-    })
+	-    .from(expenses)
+	-    .where(whereCondition)
+	-    .groupBy(expenses.date)
+	-    .orderBy(desc(expenses.date))
+	-    .limit(30);
+	-
+	-    const stats = {
+	-      total: {
+	-        count: Number(totalResult[0].count),
+	-        amount: parseFloat(totalResult[0].total || '0')
+	-      },
+	-      byCategory: categoryResult.map(row => ({
+	-        category: row.category,
+	-        count: Number(row.count),
+	-        total: parseFloat(row.total || '0')
+	-      })),
+	-      byMonth: monthlyResult.map(row => ({
+	-        month: row.month,
+	-        count: Number(row.count),
+	-        total: parseFloat(row.total || '0')
+	-      })),
+	-      daily: dailyResult.map(row => ({
+	-        date: row.date,
+	-        count: Number(row.count),
+	-        total: parseFloat(row.total || '0')
+	-      }))
+	+    const filter: DateFilter = {
+	+      startDate: startDate || undefined,
+	+      endDate: endDate || undefined
+	+    };
+	+
+	+    // Use strategy pattern to get all stats
+	+    const [totalStats, categoryStats, monthlyStats, dailyStats] = await Promise.all([
+	+      dbStrategy.getTotalStats(filter),
+	+      dbStrategy.getCategoryStats(filter),
+	+      dbStrategy.getMonthlyStats(filter),
+	+      dbStrategy.getDailyStats(filter)
+	+    ]);
+	+
+	+    const stats: ExpenseStats = {
+	+      total: totalStats,
+	+      byCategory: categoryStats,
+	+      byMonth: monthlyStats,
+	+      daily: dailyStats
+			};
+
+			return NextResponse.json(stats);
+		} catch (error) {
+			console.error('Error fetching expense stats:', error);
+	+
+	+    // Enhanced error reporting for ClickHouse issues
+	+    if (process.env.USE_CLICKHOUSE === 'true') {
+	+      console.error('ClickHouse query error details:', {
+	+        error: error instanceof Error ? error.message : 'Unknown error'
+	+      });
+	+    }
+	+
+			return NextResponse.json(
+				{ error: 'Internal server error' },
+				{ status: 500 }
+</file>
+
+
+<file type="diff" modified="true">
+	diff --git a/test/pg-expense-drizzleorm/lib/db.ts b/test/pg-expense-drizzleorm/lib/db.ts
+	index fc3e55d..5477db3 100644
+	--- a/test/pg-expense-drizzleorm/lib/db.ts
+	+++ b/test/pg-expense-drizzleorm/lib/db.ts
+	@@ -1,7 +1,11 @@
+	import { drizzle } from 'drizzle-orm/node-postgres';
+	import { Pool } from 'pg';
+	import * as schema from './schema';
+	+import { DatabaseStrategy } from './types';
+	+import { PostgreSQLStrategy } from './strategies/postgresql';
+	+import { ClickHouseStrategy } from './strategies/clickhouse';
+
+	+// PostgreSQL connection pool
+	const pool = new Pool({
+		user: process.env.DB_USER || 'postgres',
+		host: process.env.DB_HOST || 'localhost',
+	@@ -10,5 +14,28 @@ const pool = new Pool({
+		port: parseInt(process.env.DB_PORT || '5432'),
+	});
+
+	-export const db = drizzle(pool, { schema });
+	-export default db;
+	\ No newline at end of file
+	+// Drizzle instance for PostgreSQL
+	+export const pgDb = drizzle(pool, { schema });
+	+
+	+// Strategy pattern for database operations
+	+function createDatabaseStrategy(): DatabaseStrategy {
+	+  const useClickHouse = process.env.USE_CLICKHOUSE === 'true';
+	+
+	+  if (useClickHouse) {
+	+    console.log('🚀 Using ClickHouse strategy for OLAP queries');
+	+    return new ClickHouseStrategy();
+	+  } else {
+	+    console.log('🐘 Using PostgreSQL strategy for all queries');
+	+    return new PostgreSQLStrategy(pgDb);
+	+  }
+	+}
+	+
+	+// Export the strategy instance
+	+export const dbStrategy = createDatabaseStrategy();
+	+
+	+// Export PostgreSQL pool for direct access if needed
+	+export { pool as pgPool };
+	+
+	+// Export default Drizzle instance for backwards compatibility
+	+export const db = pgDb;
+	+export default pgDb;
+	\ No newline at end of file
+	(END)
+</file>
+
+<file type="new" name="pg-expense-direct/lib/clickhouse.ts">
+	import { createClient, ClickHouseClient } from '@clickhouse/client';
+
+	let clickhouseClient: ClickHouseClient | null = null;
+
+	export function getClickHouseClient(): ClickHouseClient {
+		if (!clickhouseClient) {
+			clickhouseClient = createClient({
+				url: `https://${process.env.CLICKHOUSE_HOST}` || 'http://localhost:8123',
+				username: process.env.CLICKHOUSE_USER || 'default',
+				password: process.env.CLICKHOUSE_PASSWORD || '',
+				database: process.env.CLICKHOUSE_DATABASE || 'default',
+			});
+		}
+		return clickhouseClient;
+	}
+
+	// Helper function to execute ClickHouse queries with proper error handling
+	export async function executeClickHouseQuery<T = Record<string, unknown>>(
+		query: string,
+		params: Record<string, unknown> = {}
+	): Promise<T[]> {
+		const client = getClickHouseClient();
+
+		try {
+			const result = await client.query({
+				query,
+				query_params: params,
+				format: 'JSONEachRow'
+			});
+
+			const data = await result.json() as unknown;
+			return Array.isArray(data) ? (data as T[]) : [];
+		} catch (error) {
+			console.error('ClickHouse query error:', {
+				query,
+				params,
+				error: error instanceof Error ? error.message : 'Unknown error'
+			});
+			throw error;
+		}
+	}
+</file>
+
+<file type="new" name="pg-expense-direct/lib/types.ts">
+  // Type definitions for expense application
+
+	export interface Expense {
+		id: number;
+		description: string;
+		amount: number;
+		category: string | null;
+		date: string; // ISO date string
+		created_at?: string; // ISO datetime string - PostgreSQL only
+	}
+
+	export interface StatsTotal {
+		count: number;
+		amount: number;
+	}
+
+	export interface CategoryStats {
+		category: string;
+		count: number;
+		total: number;
+	}
+
+	export interface MonthlyStats {
+		month: string | Date; // Date for PostgreSQL, string for ClickHouse
+		count: number;
+		total: number;
+	}
+
+	export interface DailyStats {
+		date: string; // ISO date string
+		count: number;
+		total: number;
+	}
+
+	export interface ExpenseStats {
+		total: StatsTotal;
+		byCategory: CategoryStats[];
+		byMonth: MonthlyStats[];
+		daily: DailyStats[];
+	}
+
+	export interface DateFilter {
+		startDate?: string;
+		endDate?: string;
+	}
+
+	export interface QueryParams extends DateFilter {
+		category?: string;
+	}
+
+	// Database strategy interface
+	export interface DatabaseStrategy {
+		getTotalStats(filter: DateFilter): Promise<StatsTotal>;
+		getCategoryStats(filter: DateFilter): Promise<CategoryStats[]>;
+		getMonthlyStats(filter: DateFilter): Promise<MonthlyStats[]>;
+		getDailyStats(filter: DateFilter): Promise<DailyStats[]>;
+		getAllExpenses(filter: QueryParams): Promise<Expense[]>;
+		createExpense(expense: Omit<Expense, 'id' | 'created_at'>): Promise<Expense>;
+	}
+</file>
+
+<file type="new" name="pg-expense-drizzleorm/lib/strategies/clickhouse.ts">
+import { executeClickHouseQuery } from '../clickhouse';
+import {
+  DatabaseStrategy,
+  DateFilter,
+  QueryParams,
+  StatsTotal,
+  CategoryStats,
+  MonthlyStats,
+  DailyStats,
+  Expense
+} from '../types';
+
+interface ClickHouseTotalResult {
+  count: number;
+  total: number | null;
+}
+
+interface ClickHouseCategoryResult {
+  category: string;
+  count: number;
+  total: number;
+}
+
+interface ClickHouseMonthlyResult {
+  month: string;
+  count: number;
+  total: number;
+}
+
+interface ClickHouseDailyResult {
+  date: string;
+  count: number;
+  total: number;
+}
+
+interface ClickHouseExpenseResult {
+  id: number;
+  description: string;
+  amount: string;
+  category: string | null;
+  date: string;
+}
+
+export class ClickHouseStrategy implements DatabaseStrategy {
+  constructor() {}
+
+  private buildWhereClause(filter: DateFilter): { whereClause: string; params: Record<string, string> } {
+    let whereClause = 'WHERE 1=1';
+    const params: Record<string, string> = {};
+
+    if (filter.startDate) {
+      whereClause += ` AND date >= {start_date:String}`;
+      params.start_date = filter.startDate;
+    }
+
+    if (filter.endDate) {
+      whereClause += ` AND date <= {end_date:String}`;
+      params.end_date = filter.endDate;
+    }
+
+    return { whereClause, params };
+  }
+
+  async getTotalStats(filter: DateFilter): Promise<StatsTotal> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const query = `SELECT COUNT(*) as count, sum(toFloat64(amount)) as total FROM expenses ${whereClause}`;
+    const result = await executeClickHouseQuery<ClickHouseTotalResult>(query, params);
+
+    if (result.length === 0) {
+      return { count: 0, amount: 0 };
+    }
+
+    return {
+      count: result[0].count,
+      amount: result[0].total || 0
+    };
+  }
+
+  async getCategoryStats(filter: DateFilter): Promise<CategoryStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const query = `SELECT
+        if(empty(category), 'Uncategorized', category) as category,
+        COUNT(*) as count,
+        sum(toFloat64(amount)) as total
+       FROM expenses ${whereClause}
+       GROUP BY category
+       ORDER BY total DESC`;
+
+    const result = await executeClickHouseQuery<ClickHouseCategoryResult>(query, params);
+
+    return result.map(row => ({
+      category: row.category || 'Uncategorized',
+      count: row.count,
+      total: row.total
+    }));
+  }
+
+  async getMonthlyStats(filter: DateFilter): Promise<MonthlyStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    // Use toStartOfMonth directly on date column (assumes date is Date32/Date type)
+    const query = `SELECT
+        toStartOfMonth(toDate(date)) as month,
+        COUNT(*) as count,
+        sum(toFloat64(amount)) as total
+       FROM expenses ${whereClause}
+       GROUP BY month
+       ORDER BY month DESC`;
+
+    const result = await executeClickHouseQuery<ClickHouseMonthlyResult>(query, params);
+
+    return result.map(row => ({
+      month: row.month,
+      count: row.count,
+      total: row.total
+    }));
+  }
+
+  async getDailyStats(filter: DateFilter): Promise<DailyStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const query = `SELECT
+        date,
+        COUNT(*) as count,
+        sum(toFloat64(amount)) as total
+       FROM expenses ${whereClause}
+       GROUP BY date
+       ORDER BY date DESC
+       LIMIT 30`;
+
+    const result = await executeClickHouseQuery<ClickHouseDailyResult>(query, params);
+
+    return result.map(row => ({
+      date: row.date,
+      count: row.count,
+      total: row.total
+    }));
+  }
+
+  async getAllExpenses(filter: QueryParams): Promise<Expense[]> {
+    let whereClause = 'WHERE 1=1';
+    const params: Record<string, string> = {};
+
+    if (filter.startDate) {
+      whereClause += ` AND date >= {start_date:String}`;
+      params.start_date = filter.startDate;
+    }
+
+    if (filter.endDate) {
+      whereClause += ` AND date <= {end_date:String}`;
+      params.end_date = filter.endDate;
+    }
+
+    if (filter.category) {
+      whereClause += ` AND category = {category:String}`;
+      params.category = filter.category;
+    }
+
+    const query = `SELECT id, description, amount, category, date FROM expenses ${whereClause} ORDER BY date DESC, id DESC`;
+    const result = await executeClickHouseQuery<ClickHouseExpenseResult>(query, params);
+
+    return result.map(row => ({
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: row.date,
+      createdAt: null // ClickHouse doesn't have createdAt
+    }));
+  }
+
+  async createExpense(expense: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense> {
+    // ClickHouse is not suitable for transactional operations like INSERT
+    // This method should not be used - OLTP operations should always use PostgreSQL
+    throw new Error('ClickHouse strategy should not be used for INSERT operations. Use PostgreSQL for OLTP operations.');
+  }
+}
+</file>
+
+<file type="new" name="pg-expense-drizzleorm/lib/strategies/postgres.ts">
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { and, gte, lte, eq, count, sum, desc, sql } from 'drizzle-orm';
+import { expenses } from '../schema';
+import {
+  DatabaseStrategy,
+  DateFilter,
+  QueryParams,
+  StatsTotal,
+  CategoryStats,
+  MonthlyStats,
+  DailyStats,
+  Expense
+} from '../types';
+
+export class PostgreSQLStrategy implements DatabaseStrategy {
+  constructor(private db: NodePgDatabase<{ expenses: typeof expenses }>) {}
+
+  private buildWhereCondition(filter: DateFilter) {
+    const conditions = [];
+
+    if (filter.startDate) {
+      conditions.push(gte(expenses.date, filter.startDate));
+    }
+
+    if (filter.endDate) {
+      conditions.push(lte(expenses.date, filter.endDate));
+    }
+
+    return conditions.length > 0 ? and(...conditions) : undefined;
+  }
+
+  async getTotalStats(filter: DateFilter): Promise<StatsTotal> {
+    const whereCondition = this.buildWhereCondition(filter);
+
+    const result = await this.db.select({
+      count: count(),
+      total: sum(expenses.amount)
+    })
+    .from(expenses)
+    .where(whereCondition);
+
+    return {
+      count: Number(result[0].count),
+      amount: parseFloat(result[0].total || '0')
+    };
+  }
+
+  async getCategoryStats(filter: DateFilter): Promise<CategoryStats[]> {
+    const whereCondition = this.buildWhereCondition(filter);
+
+    const result = await this.db.select({
+      category: sql<string>`COALESCE(${expenses.category}, 'Uncategorized')`,
+      count: count(),
+      total: sum(expenses.amount)
+    })
+    .from(expenses)
+    .where(whereCondition)
+    .groupBy(sql`COALESCE(${expenses.category}, 'Uncategorized')`)
+    .orderBy(desc(sum(expenses.amount)));
+
+    return result.map(row => ({
+      category: row.category,
+      count: Number(row.count),
+      total: parseFloat(row.total || '0')
+    }));
+  }
+
+  async getMonthlyStats(filter: DateFilter): Promise<MonthlyStats[]> {
+    const whereCondition = this.buildWhereCondition(filter);
+
+    const result = await this.db.select({
+      month: sql<Date>`DATE_TRUNC('month', ${expenses.date})`,
+      count: count(),
+      total: sum(expenses.amount)
+    })
+    .from(expenses)
+    .where(whereCondition)
+    .groupBy(sql`DATE_TRUNC('month', ${expenses.date})`)
+    .orderBy(desc(sql`DATE_TRUNC('month', ${expenses.date})`));
+
+    return result.map(row => ({
+      month: row.month,
+      count: Number(row.count),
+      total: parseFloat(row.total || '0')
+    }));
+  }
+
+  async getDailyStats(filter: DateFilter): Promise<DailyStats[]> {
+    const whereCondition = this.buildWhereCondition(filter);
+
+    const result = await this.db.select({
+      date: expenses.date,
+      count: count(),
+      total: sum(expenses.amount)
+    })
+    .from(expenses)
+    .where(whereCondition)
+    .groupBy(expenses.date)
+    .orderBy(desc(expenses.date))
+    .limit(30);
+
+    return result.map(row => ({
+      date: row.date,
+      count: Number(row.count),
+      total: parseFloat(row.total || '0')
+    }));
+  }
+
+  async getAllExpenses(filter: QueryParams): Promise<Expense[]> {
+    const conditions = [];
+
+    if (filter.startDate) {
+      conditions.push(gte(expenses.date, filter.startDate));
+    }
+
+    if (filter.endDate) {
+      conditions.push(lte(expenses.date, filter.endDate));
+    }
+
+    if (filter.category) {
+      conditions.push(eq(expenses.category, filter.category));
+    }
+
+    const result = await this.db.select()
+      .from(expenses)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(expenses.date), desc(expenses.createdAt));
+
+    return result.map(row => ({
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: row.date,
+      createdAt: row.createdAt
+    }));
+  }
+
+  async createExpense(expense: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense> {
+    const result = await this.db.insert(expenses).values({
+      description: expense.description,
+      amount: expense.amount,
+      category: expense.category || null,
+      date: expense.date || new Date().toISOString().split('T')[0]
+    }).returning();
+
+    const row = result[0];
+    return {
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: row.date,
+      createdAt: row.createdAt
+    };
+  }
+}
+</file>

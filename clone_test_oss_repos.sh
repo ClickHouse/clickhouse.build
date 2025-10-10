@@ -1,7 +1,7 @@
 #!/bin/bash
 
-mkdir -p test
-cd test
+mkdir -p test/external
+cd test/external
 
 if [ ! -d "cal.com" ]; then
     echo "Cloning cal.com..."

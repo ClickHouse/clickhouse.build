@@ -21,6 +21,7 @@ model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 class AnalyticalQuery(BaseModel):
     """Represents a single analytical SQL query found in the codebase"""
+
     description: str = Field(description="Brief description of what the query does")
     code: str = Field(description="The SQL query code or ORM query code")
     location: str = Field(
@@ -30,6 +31,7 @@ class AnalyticalQuery(BaseModel):
 
 class QueryAnalysisResult(BaseModel):
     """Result of analyzing a codebase for analytical queries"""
+
     tables: List[str] = Field(description="List of database tables used in the queries")
     total_tables: int = Field(description="The number of database tables found")
     total_queries: int = Field(description="The number of analytical queries found")
