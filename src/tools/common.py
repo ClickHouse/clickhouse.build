@@ -282,11 +282,14 @@ def load_example(orm_type: str = "orm_none") -> str:
             available_files = list(corpus_dir.glob("*.txt"))
             available_orms = [f.stem for f in available_files]
 
-            return json.dumps({
-                "error": f"Corpus file not found for ORM type: {orm_type}",
-                "available_orm_types": available_orms,
-                "content": ""
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"Corpus file not found for ORM type: {orm_type}",
+                    "available_orm_types": available_orms,
+                    "content": "",
+                },
+                indent=2,
+            )
 
         # Read the corpus file
         with open(corpus_file, "r", encoding="utf-8") as f:
@@ -296,22 +299,22 @@ def load_example(orm_type: str = "orm_none") -> str:
         file_sections = content.count("<file")
         evaluation_sections = content.count("<EVALUATION>")
 
-        return json.dumps({
-            "orm_type": orm_type,
-            "corpus_file": str(corpus_file),
-            "file_size_bytes": corpus_file.stat().st_size,
-            "content_length": len(content),
-            "file_sections": file_sections,
-            "evaluation_sections": evaluation_sections,
-            "content": content
-        }, indent=2)
+        return json.dumps(
+            {
+                "orm_type": orm_type,
+                "corpus_file": str(corpus_file),
+                "file_size_bytes": corpus_file.stat().st_size,
+                "content_length": len(content),
+                "file_sections": file_sections,
+                "evaluation_sections": evaluation_sections,
+                "content": content,
+            },
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Error loading corpus example: {e}")
-        return json.dumps({
-            "error": str(e),
-            "content": ""
-        })
+        return json.dumps({"error": str(e), "content": ""})
 
 
 @tool
@@ -467,4 +470,3 @@ def grep(
     except Exception as e:
         logger.error(f"Error in grep: {e}")
         return json.dumps({"error": str(e), "results": []})
-

@@ -10,7 +10,7 @@ from strands_tools import file_write
 
 from ..agents.qa_code_migrator import qa_approve
 from ..prompts.code_migrator import get_system_prompt
-from ..tools.common import bash_run, call_human, glob, grep, read, load_example
+from ..tools.common import bash_run, call_human, glob, grep, load_example, read
 from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,16 @@ def agent_code_migrator(repo_path: str) -> str:
             name="code_migrator",
             model=bedrock_model,
             system_prompt=get_system_prompt(repo_path),
-            tools=[grep, glob, read, bash_run, qa_approve, file_write, call_human, load_example],
+            tools=[
+                grep,
+                glob,
+                read,
+                bash_run,
+                qa_approve,
+                file_write,
+                call_human,
+                load_example,
+            ],
             callback_handler=get_callback_handler(),
         )
 
