@@ -28,6 +28,18 @@ def get_langfuse_client():
     return None
 
 
+def conditional_observe(name: str):
+    """Conditionally apply the @observe decorator based on LANGFUSE_ENABLED."""
+    langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+    if langfuse_enabled:
+        return observe(name=name)
+    else:
+        # Return a no-op decorator when langfuse is disabled
+        def decorator(func):
+            return func
+        return decorator
+
+
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
@@ -53,7 +65,7 @@ class QueryAnalysisResult(BaseModel):
 
 
 @tool
-@observe(name="agent_planner")
+@conditional_observe(name="agent_planner")
 def agent_planner(repo_path: str) -> str:
     logger.info(f"planner starting analysis of repository: {repo_path}")
 
