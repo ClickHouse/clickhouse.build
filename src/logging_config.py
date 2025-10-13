@@ -373,3 +373,38 @@ def error(name: str, message: str) -> None:
 def critical(name: str, message: str) -> None:
     """Log a critical message."""
     get_logger(name).critical(message)
+
+
+def get_chbuild_logger() -> logging.Logger:
+    """
+    Configure colorful logging for CLI scripts using colorlog.
+
+    Returns:
+        logging.Logger: The root logger configured with colorful output
+    """
+    import colorlog
+
+    handler = colorlog.StreamHandler()
+    handler.setFormatter(
+        colorlog.ColoredFormatter(
+            "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt=None,
+            reset=True,
+            log_colors={
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "red,bg_white",
+            },
+            secondary_log_colors={},
+            style="%",
+        )
+    )
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.handlers.clear()  # Clear any existing handlers
+    logger.addHandler(handler)
+
+    return logger
