@@ -17,6 +17,10 @@ def get_logo() -> str:
 
 
 def print_logo() -> None:
-    """Prints the clickhouse.build ASCII art logo in yellow."""
-    print("\033[33m" + get_logo() + "\033[0m")
+    """Prints the clickhouse.build ASCII art logo in yellow as a header."""
+    # Clear screen and move cursor to top
+    print("\033[2J\033[H", end="")
+    print("\n\n\033[33m" + get_logo() + "\033[0m")
+    print("Version: 0.1.0")
+    print("\033[33m" + "-" * 14 + "\033[0m")
     print()

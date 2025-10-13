@@ -96,7 +96,7 @@ def main():
     print("=" * 60)
 
     # Check AWS credentials
-    print("\nChecking AWS credentials...")
+    logger.info("Checking AWS credentials")
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
         print(f"Error: {error_message}")

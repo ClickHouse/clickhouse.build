@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     print_logo()
-    print("Checking AWS credentials...")
+    logger.info("Checking AWS credentials")
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
         print(f"Error: {error_message}")
