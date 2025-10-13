@@ -249,12 +249,32 @@ def call_human(prompt: str) -> str:
     Returns:
         The user's response as a string
     """
-    print(f"\n{'='*60}")
-    print(f"AGENT REQUEST FOR INPUT:")
-    print(f"{prompt}")
-    print(f"{'='*60}\n")
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import Prompt
+    import sys
 
-    user_input = input("Your response: ")
+    console = Console()
+
+    # Force a newline to break out of any active callback displays
+    sys.stdout.write('\n')
+    sys.stdout.flush()
+
+    # Display the prompt in a styled panel
+    console.print()
+    console.print(
+        Panel(
+            prompt,
+            title="[bold yellow]🤔 Agent Request for Input[/bold yellow]",
+            border_style="yellow",
+            padding=(1, 2),
+        )
+    )
+    console.print()
+
+    # Get user input with rich styling
+    user_input = Prompt.ask("[bold cyan]Your response[/bold cyan]")
+
     return user_input
 
 

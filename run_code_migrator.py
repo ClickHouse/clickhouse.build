@@ -9,6 +9,11 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Load environment variables before importing modules
+load_dotenv()
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -38,21 +43,13 @@ def main():
         print(f"Error: Repository path does not exist: {repo_path}")
         sys.exit(1)
 
-    print(f"Running code migrator on: {repo_path}")
+    print(f"Analyzing repository: {repo_path}")
     print("=" * 60)
     print()
 
     # Run the code migrator
     try:
-        result = agent_code_migrator(repo_path)
-
-        print("\n" + "=" * 60)
-        print("CODE MIGRATOR RESULTS")
-        print("=" * 60)
-        print()
-        print(result)
-        print()
-
+        agent_code_migrator(repo_path)
     except Exception as e:
         logger.error(f"Error running code migrator: {e}")
         print(f"\nError: {e}")

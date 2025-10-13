@@ -104,6 +104,10 @@ class PrintingCallbackHandler:
                     self.current_tool_id = tool_use_id
                     self.current_tool_number = self.tool_count
 
+                    # Check if this is call_human - if so, we'll auto-complete immediately
+                    # since call_human handles its own display
+                    is_call_human = tool_name == "call_human"
+
                     # Get agent name
                     agent_name = "unknown"
                     if agent:
@@ -137,18 +141,36 @@ class PrintingCallbackHandler:
                     # Store for completion display
                     self.current_tool_text = tool_text.copy()
 
-                    # Create animated display with spinner
-                    spinner = Spinner("dots", text=tool_text, style="bold blue")
-                    panel = Panel(
-                        spinner, border_style="blue", padding=(0, 1), expand=False
-                    )
+                    if is_call_human:
+                        # For call_human, show completed immediately since it handles its own display
+                        completed_text = Text()
+                        completed_text.append("✓ ", style="bold green")
+                        completed_text.append(tool_text)
 
-                    # Start live display
-                    self.console.print()
-                    self.current_live = Live(
-                        panel, console=self.console, refresh_per_second=10
-                    )
-                    self.current_live.start()
+                        completed_panel = Panel(
+                            completed_text, border_style="green", padding=(0, 1), expand=False
+                        )
+
+                        self.console.print()
+                        self.console.print(completed_panel)
+
+                        # Clear state since we're done
+                        self.current_live = None
+                        self.current_tool_id = None
+                        self.current_tool_text = None
+                    else:
+                        # Create animated display with spinner for other tools
+                        spinner = Spinner("dots", text=tool_text, style="bold blue")
+                        panel = Panel(
+                            spinner, border_style="blue", padding=(0, 1), expand=False
+                        )
+
+                        # Start live display
+                        self.console.print()
+                        self.current_live = Live(
+                            panel, console=self.console, refresh_per_second=10
+                        )
+                        self.current_live.start()
 
         if complete:
             # Complete any remaining tool

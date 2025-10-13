@@ -5,6 +5,7 @@ from strands import Agent, tool
 from strands.models import BedrockModel
 
 from ..prompts.qa_code_migrator import QA_SYSTEM_PROMPT
+from ..tui import print_error, print_info, print_success
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ Validate and return JSON with approval decision and reason.
 """
 
         logger.info(f"QA reviewing code for: {file_path}")
+        print_info(f"Reviewing code for: {file_path}", label="QA")
 
         qa_agent = Agent(
             name="qa_code_migrator",
@@ -77,13 +79,15 @@ Validate and return JSON with approval decision and reason.
                     }
                 )
 
-            # Log the decision
+            # Log and display the decision
             if result_json["approved"]:
                 logger.info(f"✅ QA APPROVED: {file_path}")
-                logger.info(f"   Reason: {result_json['reason']}")
+                print_success(f"Code approved for {file_path}")
+                print_info(result_json['reason'], label="Reason")
             else:
                 logger.warning(f"❌ QA REJECTED: {file_path}")
-                logger.warning(f"   Reason: {result_json['reason']}")
+                print_error(f"Code rejected for {file_path}")
+                print_info(result_json['reason'], label="Reason")
 
             return json.dumps(result_json)
         except json.JSONDecodeError:
@@ -91,12 +95,14 @@ Validate and return JSON with approval decision and reason.
             logger.error(
                 f"QA returned invalid JSON for {file_path}: {result_str[:200]}"
             )
+            print_error(f"QA validator returned invalid JSON for {file_path}")
             return json.dumps(
                 {"approved": False, "reason": "QA validator returned invalid JSON"}
             )
 
     except Exception as e:
         logger.error(f"Error in qa_approve: {e}")
+        print_error(f"QA validation error: {str(e)}")
         return json.dumps(
             {
                 "approved": False,
