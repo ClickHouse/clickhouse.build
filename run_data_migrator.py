@@ -18,6 +18,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.agents.data_migrator import run_data_migrator_agent
+from src.tui.logo import print_logo
 from src.utils import check_aws_credentials
 
 # Configure logging
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
+    print_logo()
     print("Checking AWS credentials...")
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
