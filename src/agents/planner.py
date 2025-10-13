@@ -1,10 +1,12 @@
 import json
 import logging
+import os
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import List
 
+from langfuse import get_client, observe
 from pydantic import BaseModel, Field
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -16,6 +18,14 @@ from ..tui import (print_code, print_error, print_header, print_info,
 from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
+
+
+def get_langfuse_client():
+    """Get or create the Langfuse client instance."""
+    langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+    if langfuse_enabled:
+        return get_client()
+    return None
 
 
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
@@ -43,6 +53,7 @@ class QueryAnalysisResult(BaseModel):
 
 
 @tool
+@observe(name="agent_planner")
 def agent_planner(repo_path: str) -> str:
     logger.info(f"planner starting analysis of repository: {repo_path}")
 
@@ -93,6 +104,12 @@ def agent_planner(repo_path: str) -> str:
 
         # Display results
         if isinstance(result, QueryAnalysisResult):
+            # Log metrics for Langfuse
+            logger.info(
+                f"Analysis complete: {result.total_queries} queries, "
+                f"{result.total_tables} tables, {elapsed_time:.2f}s"
+            )
+
             # Display summary
             summary_data = {
                 "Total Queries": result.total_queries,
@@ -162,11 +179,18 @@ def agent_planner(repo_path: str) -> str:
         plan_file.write_text(result_json)
 
         print_info(str(plan_file), label="Plan saved to")
+
+        # Flush Langfuse data
+        langfuse_client = get_langfuse_client()
+        if langfuse_client:
+            langfuse_client.flush()
+
         return result_json
 
     except Exception as e:
         logger.error(f"Exception in code_reader: {type(e).__name__}: {e}")
         print_error(str(e))
+
         error_result = {
             "error": str(e),
             "tables": [],
@@ -174,4 +198,10 @@ def agent_planner(repo_path: str) -> str:
             "total_queries": 0,
             "queries": [],
         }
+
+        # Flush Langfuse data
+        langfuse_client = get_langfuse_client()
+        if langfuse_client:
+            langfuse_client.flush()
+
         return json.dumps(error_result, indent=2)
