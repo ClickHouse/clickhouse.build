@@ -139,7 +139,7 @@ def read(file_path: str, offset: int = 0, limit: int = None) -> str:
 @tool
 def write(file_path: str, content: str) -> str:
     """
-    Write content to a file.
+    Write content to a file with user approval and rich diff display.
 
     Args:
         file_path: The path to the file to write
@@ -148,8 +148,140 @@ def write(file_path: str, content: str) -> str:
     Returns:
         JSON string containing write result
     """
+    import difflib
+
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import Confirm
+    from rich.syntax import Syntax
+    from rich.text import Text
+
+    console = Console()
+
     try:
         path = Path(file_path).resolve()
+        file_exists = path.exists()
+
+        # Force a newline to break out of any active callback displays
+        import sys
+
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+        console.print()
+
+        # Display file operation header
+        if file_exists:
+            console.print(
+                Panel(
+                    f"[bold yellow]Modify existing file[/bold yellow]\n{file_path}",
+                    border_style="yellow",
+                    padding=(0, 2),
+                )
+            )
+        else:
+            console.print(
+                Panel(
+                    f"[bold green]Create new file[/bold green]\n{file_path}",
+                    border_style="green",
+                    padding=(0, 2),
+                )
+            )
+
+        console.print()
+
+        if file_exists:
+            # Show diff for existing file
+            with open(path, "r", encoding="utf-8") as f:
+                original_content = f.read()
+
+            # Check if content is actually different
+            if original_content == content:
+                console.print("[dim]No changes detected - content is identical[/dim]")
+                console.print()
+                # Still ask for approval but make it clear nothing will change
+                approved = Confirm.ask(
+                    "[bold cyan]File is unchanged. Continue anyway?[/bold cyan]",
+                    default=False,
+                )
+                if not approved:
+                    return json.dumps(
+                        {
+                            "file": str(path),
+                            "success": True,
+                            "unchanged": True,
+                            "message": "No changes needed",
+                        },
+                        indent=2,
+                    )
+            else:
+                # Generate unified diff
+                diff = list(
+                    difflib.unified_diff(
+                        original_content.splitlines(keepends=False),
+                        content.splitlines(keepends=False),
+                        fromfile=f"a/{path.name}",
+                        tofile=f"b/{path.name}",
+                        lineterm="",
+                    )
+                )
+
+                if diff:
+                    # Display diff with syntax highlighting
+                    console.print("[bold]Changes:[/bold]")
+                    diff_text = "\n".join(diff)
+                    syntax = Syntax(
+                        diff_text, "diff", theme="monokai", line_numbers=False
+                    )
+                    console.print(syntax)
+                else:
+                    # Shouldn't happen but just in case
+                    console.print(
+                        "[yellow]Content differs but diff generation failed[/yellow]"
+                    )
+                    console.print(
+                        f"[dim]Old size: {len(original_content)} chars, New size: {len(content)} chars[/dim]"
+                    )
+        else:
+            # Show preview of new file content
+            console.print("[bold]New file content:[/bold]")
+
+            # Try to detect file type for syntax highlighting
+            extension = path.suffix.lstrip(".")
+            if not extension:
+                extension = "text"
+
+            # Show preview (first 50 lines or full content if shorter)
+            lines = content.splitlines()
+            preview_lines = lines[:50]
+            preview_content = "\n".join(preview_lines)
+
+            if len(lines) > 50:
+                preview_content += f"\n... ({len(lines) - 50} more lines)"
+
+            syntax = Syntax(
+                preview_content, extension, theme="monokai", line_numbers=True
+            )
+            console.print(syntax)
+
+        console.print()
+
+        # Ask for approval
+        approved = Confirm.ask(
+            "[bold cyan]Approve this file operation?[/bold cyan]", default=True
+        )
+
+        if not approved:
+            console.print("[yellow]✗ File operation cancelled by user[/yellow]")
+            return json.dumps(
+                {
+                    "file": str(path),
+                    "success": False,
+                    "cancelled": True,
+                    "message": "User cancelled the operation",
+                },
+                indent=2,
+            )
 
         # Create parent directories if they don't exist
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -158,24 +290,29 @@ def write(file_path: str, content: str) -> str:
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
 
+        console.print(f"[green]✓ Successfully wrote to {file_path}[/green]")
+        console.print()
+
         return json.dumps(
             {
                 "file": str(path),
                 "bytes_written": len(content.encode("utf-8")),
                 "success": True,
+                "operation": "update" if file_exists else "create",
             },
             indent=2,
         )
 
     except Exception as e:
         logger.error(f"Error in write: {e}")
+        console.print(f"[red]✗ Error: {str(e)}[/red]")
         return json.dumps({"error": str(e), "success": False})
 
 
 @tool
 def bash_run(command: str, working_dir: str = ".") -> str:
     """
-    Execute a bash command in the specified directory.
+    Execute a bash command in the specified directory with user approval.
 
     Args:
         command: The bash command to execute
@@ -184,6 +321,15 @@ def bash_run(command: str, working_dir: str = ".") -> str:
     Returns:
         JSON string containing command output and exit code
     """
+    import sys
+
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import Confirm
+    from rich.syntax import Syntax
+
+    console = Console()
+
     try:
         work_path = Path(working_dir).resolve()
 
@@ -197,6 +343,47 @@ def bash_run(command: str, working_dir: str = ".") -> str:
                 }
             )
 
+        # Force a newline to break out of any active callback displays
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+        console.print()
+
+        # Display command execution request
+        console.print(
+            Panel(
+                f"[bold cyan]Execute bash command[/bold cyan]\n\n"
+                f"[bold]Command:[/bold] [yellow]{command}[/yellow]\n"
+                f"[bold]Working directory:[/bold] [dim]{work_path}[/dim]",
+                border_style="cyan",
+                padding=(1, 2),
+            )
+        )
+
+        console.print()
+
+        # Ask for approval
+        approved = Confirm.ask(
+            "[bold cyan]Approve this command execution?[/bold cyan]", default=True
+        )
+
+        if not approved:
+            console.print("[yellow]✗ Command execution cancelled by user[/yellow]")
+            console.print()
+            return json.dumps(
+                {
+                    "command": command,
+                    "working_dir": str(work_path),
+                    "exit_code": -1,
+                    "cancelled": True,
+                    "stdout": "",
+                    "stderr": "",
+                    "message": "User cancelled the operation",
+                },
+                indent=2,
+            )
+
+        console.print(f"[dim]Running: {command}[/dim]")
         logger.info(f"Running command: {command} in {work_path}")
 
         result = subprocess.run(
@@ -207,6 +394,16 @@ def bash_run(command: str, working_dir: str = ".") -> str:
             text=True,
             timeout=300,  # 5 minute timeout
         )
+
+        # Show result
+        if result.returncode == 0:
+            console.print(f"[green]✓ Command completed successfully[/green]")
+        else:
+            console.print(
+                f"[yellow]⚠ Command exited with code {result.returncode}[/yellow]"
+            )
+
+        console.print()
 
         return json.dumps(
             {
@@ -221,6 +418,7 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
     except subprocess.TimeoutExpired:
         logger.error(f"Command timed out: {command}")
+        console.print(f"[red]✗ Command timed out after 5 minutes[/red]")
         return json.dumps(
             {
                 "error": "Command timed out after 5 minutes",
@@ -232,6 +430,7 @@ def bash_run(command: str, working_dir: str = ".") -> str:
         )
     except Exception as e:
         logger.error(f"Error running command: {e}")
+        console.print(f"[red]✗ Error: {str(e)}[/red]")
         return json.dumps(
             {"error": str(e), "exit_code": -1, "stdout": "", "stderr": ""}
         )
@@ -249,15 +448,16 @@ def call_human(prompt: str) -> str:
     Returns:
         The user's response as a string
     """
+    import sys
+
     from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Prompt
-    import sys
 
     console = Console()
 
     # Force a newline to break out of any active callback displays
-    sys.stdout.write('\n')
+    sys.stdout.write("\n")
     sys.stdout.flush()
 
     # Display the prompt in a styled panel

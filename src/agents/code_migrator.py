@@ -9,7 +9,8 @@ from strands.models import BedrockModel
 
 from ..agents.qa_code_migrator import qa_approve
 from ..prompts.code_migrator import get_system_prompt
-from ..tools.common import bash_run, call_human, glob, grep, load_example, read, write
+from ..tools.common import (bash_run, call_human, glob, grep, load_example,
+                            read, write)
 from ..tui import print_error, print_header, print_info, print_summary_panel
 from ..utils import check_aws_credentials, get_callback_handler
 
@@ -69,27 +70,21 @@ def agent_code_migrator(repo_path: str) -> str:
             callback_handler=get_callback_handler(),
         )
 
-        logger.info("=== CODE MIGRATOR AGENT STARTED ===")
-
         result = agent(
             f"Install the @clickhouse/client package in repository: {repo_path}"
         )
 
-        logger.info("=== CODE MIGRATOR AGENT COMPLETED ===")
-
         end_time = time.time()
         elapsed_time = end_time - start_time
 
-        # Display execution summary
         exec_summary = {
             "Execution Time": f"{elapsed_time:.2f}s ({elapsed_time/60:.2f}m)",
             "Status": "Success",
         }
+        print()
         print_summary_panel(exec_summary, title="Execution Summary")
 
-        # Prepare result
         result_str = str(result)
-
         print_info("Saving migration results...", label="Step 2")
 
         # Write to timestamped file

@@ -141,7 +141,10 @@ Return JSON with "assumptions" list and "config" object as specified in system p
 
             # Display assumptions if any
             if "assumptions" in result_data and result_data["assumptions"]:
-                print_info(f"Made {len(result_data['assumptions'])} assumptions", label="Notice")
+                print_info(
+                    f"Made {len(result_data['assumptions'])} assumptions",
+                    label="Notice",
+                )
                 for assumption in result_data["assumptions"]:
                     print_info(f"• {assumption}")
                 print()
@@ -159,7 +162,11 @@ Return JSON with "assumptions" list and "config" object as specified in system p
 
                 # Display curl command as bash markdown
                 if "command" in config_data:
-                    print_code(config_data["command"], language="bash", title="ClickPipe Configuration Command")
+                    print_code(
+                        config_data["command"],
+                        language="bash",
+                        title="ClickPipe Configuration Command",
+                    )
         except json.JSONDecodeError:
             # If result is not JSON, just display it as is
             print_info("Result generated successfully", label="Step 3")

@@ -83,11 +83,11 @@ Validate and return JSON with approval decision and reason.
             if result_json["approved"]:
                 logger.info(f"✅ QA APPROVED: {file_path}")
                 print_success(f"Code approved for {file_path}")
-                print_info(result_json['reason'], label="Reason")
+                print_info(result_json["reason"], label="Reason")
             else:
                 logger.warning(f"❌ QA REJECTED: {file_path}")
                 print_error(f"Code rejected for {file_path}")
-                print_info(result_json['reason'], label="Reason")
+                print_info(result_json["reason"], label="Reason")
 
             return json.dumps(result_json)
         except json.JSONDecodeError:

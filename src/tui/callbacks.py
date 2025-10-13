@@ -104,9 +104,13 @@ class PrintingCallbackHandler:
                     self.current_tool_id = tool_use_id
                     self.current_tool_number = self.tool_count
 
-                    # Check if this is call_human - if so, we'll auto-complete immediately
-                    # since call_human handles its own display
-                    is_call_human = tool_name == "call_human"
+                    # Check if this tool handles its own display - if so, we'll auto-complete immediately
+                    # Tools that show their own prompts: call_human, write, bash_run
+                    handles_own_display = tool_name in [
+                        "call_human",
+                        "write",
+                        "bash_run",
+                    ]
 
                     # Get agent name
                     agent_name = "unknown"
@@ -141,14 +145,18 @@ class PrintingCallbackHandler:
                     # Store for completion display
                     self.current_tool_text = tool_text.copy()
 
-                    if is_call_human:
-                        # For call_human, show completed immediately since it handles its own display
+                    if handles_own_display:
+                        # For tools that handle their own display (call_human, write),
+                        # show completed immediately to avoid interference
                         completed_text = Text()
                         completed_text.append("✓ ", style="bold green")
                         completed_text.append(tool_text)
 
                         completed_panel = Panel(
-                            completed_text, border_style="green", padding=(0, 1), expand=False
+                            completed_text,
+                            border_style="green",
+                            padding=(0, 1),
+                            expand=False,
                         )
 
                         self.console.print()
