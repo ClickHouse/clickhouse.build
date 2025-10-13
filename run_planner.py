@@ -42,26 +42,8 @@ def main():
     print("=" * 60)
     print()
 
-    # Run the code planner
     try:
-        result = agent_planner(repo_path)
-
-        print("\n" + "=" * 60)
-        print("ANALYSIS RESULTS")
-        print("=" * 60)
-        print()
-
-        try:
-            import json
-
-            result_json = json.loads(result)
-            print(json.dumps(result_json, indent=2))
-        except json.JSONDecodeError:
-            # Fallback to printing raw result if not valid JSON
-            print(result)
-
-        print()
-
+        agent_planner(repo_path)
     except Exception as e:
         logger.error(f"Error running code planner: {e}")
         print(f"\nError: {e}")

@@ -66,9 +66,12 @@ def extract_line_range(location: str) -> tuple:
     file_path = parts[0]
     line_part = parts[1]
 
-    # Parse line range (e.g., "27-30" or "27")
+    # Parse line range (e.g., "27-30" or "27" or "27-L30")
     if "-" in line_part:
         start, end = line_part.split("-", 1)
+        # Remove 'L' prefix if present
+        start = start.lstrip("L")
+        end = end.lstrip("L")
         return file_path, int(start), int(end)
     else:
         line = int(line_part)

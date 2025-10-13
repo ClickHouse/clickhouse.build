@@ -11,6 +11,8 @@ from strands.models import BedrockModel
 
 from ..prompts.planner import get_system_prompt
 from ..tools.common import glob, grep, read
+from ..tui import (print_code, print_error, print_header, print_info,
+                   print_list, print_summary_panel, print_table)
 from ..utils import check_aws_credentials, get_callback_handler
 
 logger = logging.getLogger(__name__)
@@ -46,11 +48,21 @@ def agent_planner(repo_path: str) -> str:
 
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
-        return f"Error: {error_message}"
+        print_error(error_message)
+        error_result = {
+            "error": error_message,
+            "tables": [],
+            "total_tables": 0,
+            "total_queries": 0,
+            "queries": [],
+        }
+        return json.dumps(error_result, indent=2)
 
     bedrock_model = BedrockModel(model_id=model_id)
 
     try:
+        print_header("Code Planner Agent", f"Repository: {repo_path}")
+
         analysis_agent = Agent(
             name="planner",
             model=bedrock_model,
@@ -60,12 +72,12 @@ def agent_planner(repo_path: str) -> str:
         )
 
         start_time = time.time()
-        logger.info(f"=== CODE PLANNER STARTED ===")
 
+        # Run analysis
         analysis_result = str(analysis_agent(repo_path))
-
         logger.info(f"Analysis result from agent: {analysis_result[:500]}...")
 
+        # Extract structured data
         extraction_agent = Agent(
             model=bedrock_model,
             system_prompt="Extract the analytical queries into structured format. Only include queries that were found in the codebase with real file locations.",
@@ -79,31 +91,87 @@ def agent_planner(repo_path: str) -> str:
         end_time = time.time()
         elapsed_time = end_time - start_time
 
-        logger.info(f"=== CODE PLANNER COMPLETED ===")
-        logger.info(f"Repository: {repo_path}")
-        logger.info(
-            f"⏱️  Total execution time: {elapsed_time:.2f} seconds ({elapsed_time/60:.2f} minutes)"
-        )
-        print(f"\n⏱️  Total execution time: {elapsed_time:.2f} seconds\n")
-
-        # Prepare result JSON
+        # Display results
         if isinstance(result, QueryAnalysisResult):
+            # Display summary
+            summary_data = {
+                "Total Queries": result.total_queries,
+                "Total Tables": result.total_tables,
+                "Execution Time": f"{elapsed_time:.2f}s ({elapsed_time/60:.2f}m)",
+            }
+            print_summary_panel(summary_data, title="Analysis Summary")
+
+            # Display tables found
+            if result.tables:
+                print_list(result.tables, title="Tables Found:")
+
+            # Display queries table
+            if result.queries:
+                queries_data = []
+                for idx, query in enumerate(result.queries, 1):
+                    code_preview = (
+                        query.code[:100] + "..."
+                        if len(query.code) > 100
+                        else query.code
+                    )
+                    queries_data.append(
+                        {
+                            "#": str(idx),
+                            "description": query.description,
+                            "location": query.location,
+                            "code": code_preview,
+                        }
+                    )
+
+                columns = {
+                    "#": {"header": "#", "style": "dim", "width": 4},
+                    "description": {"header": "Description", "style": "white"},
+                    "location": {"header": "Location", "style": "cyan"},
+                    "code": {"header": "Code Preview", "style": "yellow"},
+                }
+                print_table(
+                    queries_data,
+                    columns,
+                    title="Analytical Queries Found",
+                    show_lines=True,
+                )
+
             result_json = result.model_dump_json(indent=2)
+
+            # Display the full JSON result
+            print_code(result_json, language="json", title="Full JSON Result")
         else:
             result_json = json.dumps(
-                {"error": "Unexpected result type", "result": str(result)}
+                {
+                    "error": "Unexpected result type",
+                    "tables": [],
+                    "total_tables": 0,
+                    "total_queries": 0,
+                    "queries": [],
+                },
+                indent=2,
             )
+            print_error("Unexpected result type")
 
+        # Save plan file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         planner_dir = Path(repo_path) / ".chbuild" / "planner"
         planner_dir.mkdir(parents=True, exist_ok=True)
 
         plan_file = planner_dir / f"plan_{timestamp}.json"
         plan_file.write_text(result_json)
-        logger.info(f"Plan saved to: {plan_file}")
 
+        print_info(str(plan_file), label="Plan saved to")
         return result_json
 
     except Exception as e:
         logger.error(f"Exception in code_reader: {type(e).__name__}: {e}")
-        return f"Error processing your query: {str(e)}"
+        print_error(str(e))
+        error_result = {
+            "error": str(e),
+            "tables": [],
+            "total_tables": 0,
+            "total_queries": 0,
+            "queries": [],
+        }
+        return json.dumps(error_result, indent=2)
