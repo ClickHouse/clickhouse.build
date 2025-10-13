@@ -9,6 +9,7 @@ import os
 import sys
 from pathlib import Path
 
+import colorlog
 from dotenv import load_dotenv
 
 # Load environment variables before importing modules
@@ -21,12 +22,28 @@ from src.agents.data_migrator import run_data_migrator_agent
 from src.tui.logo import print_logo
 from src.utils import check_aws_credentials
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# Configure colorful logging
+handler = colorlog.StreamHandler()
+handler.setFormatter(
+    colorlog.ColoredFormatter(
+        "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt=None,
+        reset=True,
+        log_colors={
+            "DEBUG": "cyan",
+            "INFO": "green",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "red,bg_white",
+        },
+        secondary_log_colors={},
+        style="%",
+    )
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
 
 
 def main():

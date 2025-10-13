@@ -15,6 +15,7 @@ dependencies = [
     "textual>=6.1.0",
     "langfuse>=3.6.2",
     "python-dotenv>=1.0.0",
+    "colorlog>=6.9.0",
 ]
 
 [project.scripts]
