@@ -10,7 +10,7 @@ from strands.models import BedrockModel
 from ..agents.qa_code_migrator import qa_approve
 from ..prompts.code_migrator import get_system_prompt
 from ..tools.common import (bash_run, call_human, glob, grep, load_example,
-                            read, write)
+                            read, reset_confirmations, write)
 from ..tui import print_error, print_header, print_info, print_summary_panel
 from ..utils import check_aws_credentials, get_callback_handler
 
@@ -31,6 +31,9 @@ def agent_code_migrator(repo_path: str) -> str:
         Migration guidance (currently just a hello world message)
     """
     logger.info(f"Code migrator agent starting analysis of repository: {repo_path}")
+
+    # Reset confirmation state for this agent run
+    reset_confirmations()
 
     creds_available, error_message = check_aws_credentials()
     if not creds_available:

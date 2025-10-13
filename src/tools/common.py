@@ -21,6 +21,26 @@ EXCLUDED_DIRS = {
     "build",
 }
 
+# Global state to track if user selected "all" for confirmations
+_skip_confirmations = False
+
+
+def reset_confirmations():
+    """Reset the confirmation skip state."""
+    global _skip_confirmations
+    _skip_confirmations = False
+
+
+def should_skip_confirmation() -> bool:
+    """Check if confirmations should be skipped."""
+    return _skip_confirmations
+
+
+def set_skip_confirmations():
+    """Set the flag to skip future confirmations."""
+    global _skip_confirmations
+    _skip_confirmations = True
+
 
 @tool
 def glob(pattern: str, path: str = ".") -> str:
@@ -152,7 +172,7 @@ def write(file_path: str, content: str) -> str:
 
     from rich.console import Console
     from rich.panel import Panel
-    from rich.prompt import Confirm
+    from rich.prompt import Confirm, Prompt
     from rich.syntax import Syntax
     from rich.text import Text
 
@@ -200,10 +220,27 @@ def write(file_path: str, content: str) -> str:
                 console.print("[dim]No changes detected - content is identical[/dim]")
                 console.print()
                 # Still ask for approval but make it clear nothing will change
-                approved = Confirm.ask(
-                    "[bold cyan]File is unchanged. Continue anyway?[/bold cyan]",
-                    default=False,
-                )
+                if should_skip_confirmation():
+                    approved = False  # For unchanged files, default to not continuing
+                    console.print(
+                        "[dim]Skipping unchanged file (user selected 'all')[/dim]"
+                    )
+                else:
+                    response = Prompt.ask(
+                        "[bold cyan]File is unchanged. Continue anyway? (y/n/all)[/bold cyan]",
+                        choices=["y", "n", "all"],
+                        default="n",
+                    )
+
+                    if response == "all":
+                        set_skip_confirmations()
+                        approved = False  # For unchanged files, even 'all' means skip
+                        console.print(
+                            "[green]All future operations will be auto-approved[/green]"
+                        )
+                    else:
+                        approved = response == "y"
+
                 if not approved:
                     return json.dumps(
                         {
@@ -266,10 +303,25 @@ def write(file_path: str, content: str) -> str:
 
         console.print()
 
-        # Ask for approval
-        approved = Confirm.ask(
-            "[bold cyan]Approve this file operation?[/bold cyan]", default=True
-        )
+        # Ask for approval (unless user selected "all" previously)
+        if should_skip_confirmation():
+            approved = True
+            console.print("[dim]Auto-approved (user selected 'all')[/dim]")
+        else:
+            response = Prompt.ask(
+                "[bold cyan]Approve this file operation? (y/n/all)[/bold cyan]",
+                choices=["y", "n", "all"],
+                default="y",
+            )
+
+            if response == "all":
+                set_skip_confirmations()
+                approved = True
+                console.print(
+                    "[green]All future operations will be auto-approved[/green]"
+                )
+            else:
+                approved = response == "y"
 
         if not approved:
             console.print("[yellow]✗ File operation cancelled by user[/yellow]")
@@ -325,7 +377,7 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
     from rich.console import Console
     from rich.panel import Panel
-    from rich.prompt import Confirm
+    from rich.prompt import Confirm, Prompt
     from rich.syntax import Syntax
 
     console = Console()
@@ -362,10 +414,25 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
         console.print()
 
-        # Ask for approval
-        approved = Confirm.ask(
-            "[bold cyan]Approve this command execution?[/bold cyan]", default=True
-        )
+        # Ask for approval (unless user selected "all" previously)
+        if should_skip_confirmation():
+            approved = True
+            console.print("[dim]Auto-approved (user selected 'all')[/dim]")
+        else:
+            response = Prompt.ask(
+                "[bold cyan]Approve this command execution? (y/n/all)[/bold cyan]",
+                choices=["y", "n", "all"],
+                default="y",
+            )
+
+            if response == "all":
+                set_skip_confirmations()
+                approved = True
+                console.print(
+                    "[green]All future operations will be auto-approved[/green]"
+                )
+            else:
+                approved = response == "y"
 
         if not approved:
             console.print("[yellow]✗ Command execution cancelled by user[/yellow]")
