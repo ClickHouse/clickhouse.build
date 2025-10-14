@@ -391,8 +391,9 @@ def get_chbuild_logger() -> tuple[logging.Logger, str]:
     Returns:
         tuple[logging.Logger, str]: The root logger configured with colorful output and the log file path
     """
-    import colorlog
     from datetime import datetime
+
+    import colorlog
 
     # Console handler with colors
     console_handler = colorlog.StreamHandler()

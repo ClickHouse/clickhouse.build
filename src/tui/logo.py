@@ -23,4 +23,3 @@ def print_logo() -> None:
     print("\n\n\033[33m" + get_logo() + "\033[0m")
     print("Version: 0.1.0")
     print("\033[33m" + "-" * 14 + "\033[0m")
-    print()

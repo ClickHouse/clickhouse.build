@@ -38,6 +38,7 @@ def conditional_observe(name: str):
         # Return a no-op decorator when langfuse is disabled
         def decorator(func):
             return func
+
         return decorator
 
 
