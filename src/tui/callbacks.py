@@ -13,6 +13,16 @@ from rich.text import Text
 class PrintingCallbackHandler:
     """Handler for streaming text output and tool invocations to stdout with rich formatting."""
 
+    TOOL_NAME_MAP = {
+        "read": "Read",
+        "write": "Write",
+        "glob": "Search",
+        "grep": "Search",
+        "bash_run": "Bash",
+        "call_human": "CallHuman",
+        "load_example": "LoadExample",
+    }
+
     def __init__(self) -> None:
         """Initialize handler."""
         self.tool_count = 0
@@ -112,19 +122,11 @@ class PrintingCallbackHandler:
                         "bash_run",
                     ]
 
-                    # Get agent name
-                    agent_name = "unknown"
-                    if agent:
-                        # Try to get the agent's name or class name
-                        agent_name = (
-                            getattr(agent, "name", None) or agent.__class__.__name__
-                        )
-
                     # Build formatted tool call text
                     tool_text = Text()
-                    tool_text.append(f"[{agent_name}]", style="dim cyan")
-                    tool_text.append(f" Tool #{self.tool_count}: ", style="dim")
-                    tool_text.append(f"{tool_name}", style="bold yellow")
+                    tool_text.append(f"Tool #{self.tool_count}: ", style="dim")
+                    display_name = self.TOOL_NAME_MAP.get(tool_name, tool_name)
+                    tool_text.append(f"{display_name}", style="bold purple")
 
                     # Format parameters
                     param_parts = []
