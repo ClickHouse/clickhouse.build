@@ -13,6 +13,7 @@ from ..tools.common import (bash_run, call_human, glob, grep, load_example,
                             read, reset_confirmations, write)
 from ..tui import print_error, print_header, print_info, print_summary_panel
 from ..utils import check_aws_credentials, get_callback_handler
+from ..utils.langfuse import conditional_observe, get_langfuse_client
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
 @tool
+@conditional_observe(name="agent_code_migrator")
 def agent_code_migrator(repo_path: str) -> str:
     """
     Run the code migrator agent to help migrate application code.
@@ -113,6 +115,11 @@ def agent_code_migrator(repo_path: str) -> str:
         plan_file.write_text(json.dumps(result_json, indent=2))
         print_info(str(plan_file), label="Migration saved to")
 
+        # Flush Langfuse data
+        langfuse_client = get_langfuse_client()
+        if langfuse_client:
+            langfuse_client.flush()
+
         return result_str
 
     except Exception as e:
@@ -130,5 +137,10 @@ def agent_code_migrator(repo_path: str) -> str:
             "_metadata": {"timestamp": timestamp, "status": "error"},
         }
         error_file.write_text(json.dumps(error_data, indent=2))
+
+        # Flush Langfuse data
+        langfuse_client = get_langfuse_client()
+        if langfuse_client:
+            langfuse_client.flush()
 
         return f"Error running code migrator: {str(e)}"

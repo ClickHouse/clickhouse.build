@@ -11,6 +11,7 @@ from ..tools.data_migrator import create_clickpipe
 from ..tui import (print_code, print_error, print_header, print_info,
                    print_summary_panel)
 from ..utils import check_aws_credentials, get_callback_handler
+from ..utils.langfuse import conditional_observe, get_langfuse_client
 from .scanner import agent_scanner
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ def get_latest_scan(repo_path: str) -> dict:
         return json.load(f)
 
 
+@conditional_observe(name="run_data_migrator_agent")
 def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> str:
     """
     Run the data migrator agent to analyze the scan and generate ClickPipe config.
@@ -171,13 +173,30 @@ Return JSON with "assumptions" list and "config" object as specified in system p
             # If result is not JSON, just display it as is
             print_info("Result generated successfully", label="Step 3")
 
+        # Flush Langfuse data
+        langfuse_client = get_langfuse_client()
+        if langfuse_client:
+            langfuse_client.flush()
+
         return result_str
 
     except FileNotFoundError as e:
         logger.error(f"File not found: {str(e)}")
         print_error(str(e))
+
+        # Flush Langfuse data
+        langfuse_client = get_langfuse_client()
+        if langfuse_client:
+            langfuse_client.flush()
+
         return f"Error: {str(e)}"
     except Exception as e:
         logger.error(f"Exception in data_migrator_agent: {type(e).__name__}: {e}")
         print_error(str(e))
+
+        # Flush Langfuse data
+        langfuse_client = get_langfuse_client()
+        if langfuse_client:
+            langfuse_client.flush()
+
         return f"Error analyzing scan: {str(e)}"

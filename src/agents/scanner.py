@@ -1,12 +1,10 @@
 import json
 import logging
-import os
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from langfuse import get_client, observe
 from pydantic import BaseModel, Field
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -17,29 +15,9 @@ from ..tools.common import glob, grep, read
 from ..tui import (print_code, print_error, print_header, print_info,
                    print_list, print_summary_panel, print_table)
 from ..utils import check_aws_credentials, get_callback_handler
+from ..utils.langfuse import conditional_observe, get_langfuse_client
 
 logger = logging.getLogger(__name__)
-
-
-def get_langfuse_client():
-    """Get or create the Langfuse client instance."""
-    langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
-    if langfuse_enabled:
-        return get_client()
-    return None
-
-
-def conditional_observe(name: str):
-    """Conditionally apply the @observe decorator based on LANGFUSE_ENABLED."""
-    langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
-    if langfuse_enabled:
-        return observe(name=name)
-    else:
-        # Return a no-op decorator when langfuse is disabled
-        def decorator(func):
-            return func
-
-        return decorator
 
 
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
@@ -114,15 +92,12 @@ def agent_scanner(repo_path: str) -> str:
         end_time = time.time()
         elapsed_time = end_time - start_time
 
-        # Display results
         if isinstance(result, QueryAnalysisResult):
-            # Log metrics for Langfuse
             logger.info(
                 f"Analysis complete: {result.total_queries} queries, "
                 f"{result.total_tables} tables, {elapsed_time:.2f}s"
             )
 
-            # Display summary
             summary_data = {
                 "Total Queries": result.total_queries,
                 "Total Tables": result.total_tables,
@@ -130,11 +105,9 @@ def agent_scanner(repo_path: str) -> str:
             }
             print_summary_panel(summary_data, title="Analysis Summary")
 
-            # Display tables found
             if result.tables:
                 print_list(result.tables, title="Tables Found:")
 
-            # Display queries table
             if result.queries:
                 queries_data = []
                 for idx, query in enumerate(result.queries, 1):
@@ -166,8 +139,6 @@ def agent_scanner(repo_path: str) -> str:
                 )
 
             result_json = result.model_dump_json(indent=2)
-
-            # Display the full JSON result
             print_code(result_json, language="json", title="Full JSON Result")
         else:
             result_json = json.dumps(
@@ -182,7 +153,6 @@ def agent_scanner(repo_path: str) -> str:
             )
             print_error("Unexpected result type")
 
-        # Save scan file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         scanner_dir = Path(repo_path) / ".chbuild" / "scanner"
         scanner_dir.mkdir(parents=True, exist_ok=True)
@@ -192,12 +162,10 @@ def agent_scanner(repo_path: str) -> str:
 
         print_info(str(scan_file), label="Scan saved to")
 
-        # Display log file location
         log_file = get_current_log_file()
         if log_file:
             print_info(log_file, label="Logs saved to")
 
-        # Flush Langfuse data
         langfuse_client = get_langfuse_client()
         if langfuse_client:
             langfuse_client.flush()

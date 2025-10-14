@@ -3,7 +3,7 @@ import os
 import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 
-from .tui import PrintingCallbackHandler
+from ..tui import PrintingCallbackHandler
 
 
 def get_callback_handler():
