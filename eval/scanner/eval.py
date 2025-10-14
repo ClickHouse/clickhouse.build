@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Evaluation script for the code_planner agent.
+Evaluation script for the code_scanner agent.
 Tests against ground truth data and calculates precision, recall, and F1 scores.
 """
 
@@ -14,7 +14,7 @@ from typing import Any, Dict
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.agents.planner import agent_planner
+from src.agents.scanner import agent_scanner
 from src.utils import check_aws_credentials
 
 # Configure logging
@@ -184,7 +184,7 @@ def run_single_eval(test_case: Dict, base_path: str) -> Dict[str, Any]:
         }
 
     try:
-        result_json = agent_planner(repo_path)
+        result_json = agent_scanner(repo_path)
         actual = json.loads(result_json)
     except Exception as e:
         return {"name": name, "status": "ERROR", "error": str(e)}
@@ -270,7 +270,7 @@ def run_single_eval(test_case: Dict, base_path: str) -> Dict[str, Any]:
 def main():
     """Main evaluation function"""
     print("=" * 60)
-    print("CODE PLANNER EVALUATION")
+    print("CODE SCANNER EVALUATION")
     print("=" * 60)
 
     # Check AWS credentials

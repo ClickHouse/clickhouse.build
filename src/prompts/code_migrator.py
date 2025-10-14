@@ -24,14 +24,14 @@ First, install the ClickHouse client library and understand the application's da
 
 Here is a previous example:
 
-1. **Read the latest plan**
-   - Use glob to find plan files in .chbuild/planner/plan_*.json
-   - If NO plan files exist, immediately return this JSON and STOP:
+1. **Read the latest scan**
+   - Use glob to find scan files in .chbuild/scanner/scan_*.json
+   - If NO scan files exist, immediately return this JSON and STOP:
      {{
-       "error": "No plan found. Please run the planner first to analyze your queries.",
-       "plan_found": false
+       "error": "No scan found. Please run the scanner first to analyze your queries.",
+       "scan_found": false
      }}
-   - If plan files exist, read the most recent plan file (sorted by filename)
+   - If scan files exist, read the most recent scan file (sorted by filename)
    - Understand what tables and queries exist in the application
 
 2. **Determine the package manager**
@@ -62,8 +62,8 @@ Here is a previous example:
    - Use this example as a reference guide for your implementation, but do not overfit to it. Adapt it to the users codebase
 
 6. **Design strategy pattern for query routing**
-   - Re-read the planner file to understand all query locations
-   - Use read tool to inspect each query site (file and line numbers from the plan)
+   - Re-read the scanner file to understand all query locations
+   - Use read tool to inspect each query site (file and line numbers from the scan)
    - Design a strategy pattern that:
      a) Maintains backwards compatibility with existing PostgreSQL / ORM queries
      b) Allows toggling between PostgreSQL and ClickHouse via environment variable
@@ -84,12 +84,12 @@ Here is a previous example:
      e) If approved=false: revise the code based on the reason and try qa_approve again
      f) Do NOT use file_write without qa_approve approval
    - Create necessary files (e.g., query router, ClickHouse client wrapper, type definitions)
-   - Update each query site identified in the plan to use the new strategy pattern
+   - Update each query site identified in the scan to use the new strategy pattern
    - Ensure all code maintains backwards compatibility with the ORM / quries
    - Return a JSON object with:
      {{
-       "plan_found": true,
-       "tables": [...list from plan...],
+       "scan_found": true,
+       "tables": [...list from scan...],
        "package_manager": "...",
        "installed": true/false,
        "version": "...",

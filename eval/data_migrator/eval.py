@@ -133,18 +133,18 @@ def run_single_eval(
         }
 
     try:
-        # Read the fixture plan
+        # Read the fixture scan
         with open(fixture_path, "r") as f:
-            plan_data = json.load(f)
+            scan_data = json.load(f)
 
-        # Create .chbuild/planner directory and place fixture there
-        planner_dir = Path(repo_path) / ".chbuild" / "planner"
-        planner_dir.mkdir(parents=True, exist_ok=True)
+        # Create .chbuild/scanner directory and place fixture there
+        scanner_dir = Path(repo_path) / ".chbuild" / "scanner"
+        scanner_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write fixture as the "latest" plan
-        plan_file = planner_dir / "plan_fixture.json"
-        with open(plan_file, "w") as f:
-            json.dump(plan_data, f, indent=2)
+        # Write fixture as the "latest" scan
+        scan_file = scanner_dir / "scan_fixture.json"
+        with open(scan_file, "w") as f:
+            json.dump(scan_data, f, indent=2)
 
         # Run data migrator (it will read the fixture we just placed)
         result_str = run_data_migrator_agent(repo_path, replication_mode)

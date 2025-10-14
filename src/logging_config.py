@@ -375,17 +375,28 @@ def critical(name: str, message: str) -> None:
     get_logger(name).critical(message)
 
 
-def get_chbuild_logger() -> logging.Logger:
+# Store the current log file path
+_current_log_file: Optional[str] = None
+
+
+def get_current_log_file() -> Optional[str]:
+    """Get the path to the current log file."""
+    return _current_log_file
+
+
+def get_chbuild_logger() -> tuple[logging.Logger, str]:
     """
     Configure colorful logging for CLI scripts using colorlog.
 
     Returns:
-        logging.Logger: The root logger configured with colorful output
+        tuple[logging.Logger, str]: The root logger configured with colorful output and the log file path
     """
     import colorlog
+    from datetime import datetime
 
-    handler = colorlog.StreamHandler()
-    handler.setFormatter(
+    # Console handler with colors
+    console_handler = colorlog.StreamHandler()
+    console_handler.setFormatter(
         colorlog.ColoredFormatter(
             "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             datefmt=None,
@@ -402,9 +413,35 @@ def get_chbuild_logger() -> logging.Logger:
         )
     )
 
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    logger.handlers.clear()  # Clear any existing handlers
-    logger.addHandler(handler)
+    # File handler for all logs
+    log_dir = Path("/var/log/chbuild")
 
-    return logger
+    # Try to create /var/log/chbuild, fall back to user's home directory if permission denied
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        log_dir = Path.home() / ".chbuild" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"scanner_{timestamp}.log"
+
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setLevel(logging.INFO)  # Capture INFO level and above to file
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)  # Set root logger to INFO
+    logger.handlers.clear()  # Clear any existing handlers
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+    console_handler.setLevel(logging.WARNING)  # Only show warnings and above in console
+
+    # Store the log file path globally
+    global _current_log_file
+    _current_log_file = str(log_file)
+
+    return logger, str(log_file)

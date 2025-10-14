@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""
+ClickHouse Build - PostgreSQL to ClickHouse Migration Tool
+Main CLI entry point for running various migration agents.
+"""
+
+import logging
+import os
+import sys
+from pathlib import Path
+
+import rich_click as click
+from dotenv import load_dotenv
+
+# Configure rich-click for better styling
+click.rich_click.USE_RICH_MARKUP = True
+click.rich_click.SHOW_ARGUMENTS = True
+click.rich_click.GROUP_ARGUMENTS_OPTIONS = True
+click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
+click.rich_click.ERRORS_SUGGESTION = ""
+click.rich_click.ERRORS_EPILOGUE = ""
+
+# Load environment variables before importing modules
+load_dotenv()
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent))
+
+from src.logging_config import get_chbuild_logger
+from src.tui.logo import print_logo
+from src.utils import check_aws_credentials
+
+# Configure colorful logging
+_, log_file_path = get_chbuild_logger()
+logger = logging.getLogger(__name__)
+
+
+@click.group(invoke_without_command=True)
+@click.version_option(version="1.0.0", prog_name="clickhouse-build")
+@click.pass_context
+def main(ctx):
+    """PostgreSQL to ClickHouse Migration Tool with AI-powered query conversion."""
+    # Always print logo
+    print_logo()
+
+    # If no subcommand is provided, show help
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+
+
+@main.command()
+@click.argument(
+    "repo_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True),
+    required=False,
+    default="test/pg-expense-direct",
+)
+@click.option(
+    "--skip-credentials-check",
+    is_flag=True,
+    help="Skip AWS credentials validation",
+)
+def scanner(repo_path: str, skip_credentials_check: bool):
+    """
+    Run the scanner agent to analyze a repository and find PostgreSQL analytical queries.
+
+    REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
+    """
+    if not skip_credentials_check:
+        logger.info("Checking AWS credentials...")
+        creds_available, error_message = check_aws_credentials()
+        if not creds_available:
+            click.secho(f"Error: {error_message}", fg="red", err=True)
+            sys.exit(1)
+        click.secho("✓ AWS credentials found and valid\n", fg="green")
+
+    # Resolve absolute path
+    repo_path = os.path.abspath(repo_path)
+
+    if not os.path.exists(repo_path):
+        click.secho(f"Error: Repository path does not exist: {repo_path}", fg="red", err=True)
+        sys.exit(1)
+
+    click.echo(f"Analyzing repository: {repo_path}")
+    click.echo("=" * 60)
+    click.echo()
+
+    try:
+        from src.agents.scanner import agent_scanner
+        agent_scanner(repo_path)
+        click.secho("\n✓ Scanner completed successfully", fg="green")
+    except Exception as e:
+        logger.error(f"Error running scanner: {e}")
+        click.secho(f"\nError: {e}", fg="red", err=True)
+        sys.exit(1)
+
+
+@main.command()
+@click.argument(
+    "repo_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True),
+    required=False,
+    default="test/pg-expense-direct",
+)
+@click.option(
+    "--skip-credentials-check",
+    is_flag=True,
+    help="Skip AWS credentials validation",
+)
+def code_migrator(repo_path: str, skip_credentials_check: bool):
+    """
+    Run the code migrator agent to help migrate application code.
+
+    REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
+    """
+    print_logo()
+
+    if not skip_credentials_check:
+        logger.info("Checking AWS credentials...")
+        creds_available, error_message = check_aws_credentials()
+        if not creds_available:
+            click.secho(f"Error: {error_message}", fg="red", err=True)
+            sys.exit(1)
+        click.secho("✓ AWS credentials found and valid\n", fg="green")
+
+    # Resolve absolute path
+    repo_path = os.path.abspath(repo_path)
+
+    if not os.path.exists(repo_path):
+        click.secho(f"Error: Repository path does not exist: {repo_path}", fg="red", err=True)
+        sys.exit(1)
+
+    click.echo(f"Analyzing repository: {repo_path}")
+    click.echo("=" * 60)
+    click.echo()
+
+    try:
+        from src.agents.code_migrator import agent_code_migrator
+        agent_code_migrator(repo_path)
+        click.secho("\n✓ Code migrator completed successfully", fg="green")
+    except Exception as e:
+        logger.error(f"Error running code migrator: {e}")
+        click.secho(f"\nError: {e}", fg="red", err=True)
+        sys.exit(1)
+
+
+@main.command()
+@click.argument(
+    "repo_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True),
+    required=False,
+    default="test/pg-expense-direct",
+)
+@click.option(
+    "--replication-mode",
+    type=click.Choice(["cdc", "snapshot", "hybrid"], case_sensitive=False),
+    default="cdc",
+    help="Replication mode for data migration",
+)
+@click.option(
+    "--skip-credentials-check",
+    is_flag=True,
+    help="Skip AWS credentials validation",
+)
+def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check: bool):
+    """
+    Run the data migrator agent to analyze the plan and generate ClickPipe configuration.
+
+    REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
+    """
+    print_logo()
+
+    if not skip_credentials_check:
+        logger.info("Checking AWS credentials...")
+        creds_available, error_message = check_aws_credentials()
+        if not creds_available:
+            click.secho(f"Error: {error_message}", fg="red", err=True)
+            sys.exit(1)
+        click.secho("✓ AWS credentials found and valid\n", fg="green")
+
+    # Resolve absolute path
+    repo_path = os.path.abspath(repo_path)
+
+    if not os.path.exists(repo_path):
+        click.secho(f"Error: Repository path does not exist: {repo_path}", fg="red", err=True)
+        sys.exit(1)
+
+    click.echo(f"Analyzing repository: {repo_path}")
+    click.echo(f"Replication mode: {replication_mode}")
+    click.echo("=" * 60)
+    click.echo()
+
+    try:
+        from src.agents.data_migrator import run_data_migrator_agent
+        run_data_migrator_agent(repo_path, replication_mode=replication_mode)
+        click.secho("\n✓ Data migrator completed successfully", fg="green")
+    except Exception as e:
+        logger.error(f"Error running data migrator: {e}")
+        click.secho(f"\nError: {e}", fg="red", err=True)
+        sys.exit(1)
+
+
+@main.command()
+@click.argument(
+    "repo_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True),
+    required=False,
+    default="test/pg-expense-direct",
+)
+@click.option(
+    "--replication-mode",
+    type=click.Choice(["cdc", "snapshot", "hybrid"], case_sensitive=False),
+    default="cdc",
+    help="Replication mode for data migration",
+)
+@click.option(
+    "--skip-credentials-check",
+    is_flag=True,
+    help="Skip AWS credentials validation",
+)
+def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool):
+    """
+    Run the complete migration workflow: scanner -> code_migrator -> data_migrator.
+
+    REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
+    """
+    print_logo()
+
+    if not skip_credentials_check:
+        logger.info("Checking AWS credentials...")
+        creds_available, error_message = check_aws_credentials()
+        if not creds_available:
+            click.secho(f"Error: {error_message}", fg="red", err=True)
+            sys.exit(1)
+        click.secho("✓ AWS credentials found and valid\n", fg="green")
+
+    # Resolve absolute path
+    repo_path = os.path.abspath(repo_path)
+
+    if not os.path.exists(repo_path):
+        click.secho(f"Error: Repository path does not exist: {repo_path}", fg="red", err=True)
+        sys.exit(1)
+
+    click.echo(f"Analyzing repository: {repo_path}")
+    click.echo("=" * 60)
+    click.echo()
+
+    try:
+        # Step 1: Run scanner
+        click.secho("\n[1/3] Running scanner agent...", fg="cyan", bold=True)
+        from src.agents.scanner import agent_scanner
+        agent_scanner(repo_path)
+        click.secho("✓ Scanner completed", fg="green")
+
+        # Step 2: Run code migrator
+        click.secho("\n[2/3] Running code migrator agent...", fg="cyan", bold=True)
+        from src.agents.code_migrator import agent_code_migrator
+        agent_code_migrator(repo_path)
+        click.secho("✓ Code migrator completed", fg="green")
+
+        # Step 3: Run data migrator
+        click.secho(f"\n[3/3] Running data migrator agent (mode: {replication_mode})...", fg="cyan", bold=True)
+        from src.agents.data_migrator import run_data_migrator_agent
+        run_data_migrator_agent(repo_path, replication_mode=replication_mode)
+        click.secho("✓ Data migrator completed", fg="green")
+
+        click.secho("\n✓ Complete migration workflow finished successfully!", fg="green", bold=True)
+    except Exception as e:
+        logger.error(f"Error during migration: {e}")
+        click.secho(f"\nError: {e}", fg="red", err=True)
+        sys.exit(1)
+
+
+@main.command()
+@click.argument(
+    "agent",
+    type=click.Choice(["scanner", "data-migrator"], case_sensitive=False),
+    required=True,
+)
+def eval(agent: str):
+    """
+    Run evaluations for the specified agent.
+
+    AGENT: The agent to evaluate (scanner or data-migrator)
+    """
+    print_logo()
+
+    click.secho(f"\nRunning {agent} evaluation...\n", fg="cyan", bold=True)
+
+    eval_dir = Path(__file__).parent / "eval" / agent.replace("-", "_")
+    eval_script = eval_dir / "eval.py"
+
+    if not eval_script.exists():
+        click.secho(f"Error: Evaluation script not found: {eval_script}", fg="red", err=True)
+        sys.exit(1)
+
+    try:
+        # Run the eval script
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, str(eval_script)],
+            cwd=str(eval_dir),
+            capture_output=False,
+        )
+        sys.exit(result.returncode)
+    except Exception as e:
+        logger.error(f"Error running evaluation: {e}")
+        click.secho(f"\nError: {e}", fg="red", err=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

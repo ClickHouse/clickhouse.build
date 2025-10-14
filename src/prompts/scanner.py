@@ -48,4 +48,5 @@ You will return structured JSON with:
   - description: Brief description of what the query does
   - code: The actual SQL or ORM query code
   - location: File path with line numbers (e.g., /app/api/route.ts:L60-65)
+- You do not need to print the structured output
 """

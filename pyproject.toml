@@ -16,6 +16,8 @@ dependencies = [
     "langfuse>=3.6.2",
     "python-dotenv>=1.0.0",
     "colorlog>=6.9.0",
+    "click>=8.2.1",
+    "rich-click>=1.9.3",
 ]
 
 [project.scripts]

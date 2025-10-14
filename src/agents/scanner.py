@@ -11,7 +11,8 @@ from pydantic import BaseModel, Field
 from strands import Agent, tool
 from strands.models import BedrockModel
 
-from ..prompts.planner import get_system_prompt
+from ..logging_config import get_current_log_file
+from ..prompts.scanner import get_system_prompt
 from ..tools.common import glob, grep, read
 from ..tui import (print_code, print_error, print_header, print_info,
                    print_list, print_summary_panel, print_table)
@@ -65,9 +66,9 @@ class QueryAnalysisResult(BaseModel):
 
 
 @tool
-@conditional_observe(name="agent_planner")
-def agent_planner(repo_path: str) -> str:
-    logger.info(f"planner starting analysis of repository: {repo_path}")
+@conditional_observe(name="agent_scanner")
+def agent_scanner(repo_path: str) -> str:
+    logger.info(f"scanner starting analysis of repository: {repo_path}")
 
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
@@ -84,10 +85,10 @@ def agent_planner(repo_path: str) -> str:
     bedrock_model = BedrockModel(model_id=model_id)
 
     try:
-        print_header("Code Planner Agent", f"Repository: {repo_path}")
+        print_header("Code Scanner Agent", f"Repository: {repo_path}")
 
         analysis_agent = Agent(
-            name="planner",
+            name="scanner",
             model=bedrock_model,
             system_prompt=get_system_prompt(repo_path),
             tools=[glob, grep, read],
@@ -96,14 +97,12 @@ def agent_planner(repo_path: str) -> str:
 
         start_time = time.time()
 
-        # Run analysis
         analysis_result = str(analysis_agent(repo_path))
         logger.info(f"Analysis result from agent: {analysis_result[:500]}...")
 
-        # Extract structured data
         extraction_agent = Agent(
             model=bedrock_model,
-            system_prompt="Extract the analytical queries into structured format. Only include queries that were found in the codebase with real file locations.",
+            system_prompt="Extract the analytical queries into structured format. Only include queries that were found in the codebase with real file locations. You do not have to print it",
         )
 
         result = extraction_agent.structured_output(
@@ -182,15 +181,20 @@ def agent_planner(repo_path: str) -> str:
             )
             print_error("Unexpected result type")
 
-        # Save plan file
+        # Save scan file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        planner_dir = Path(repo_path) / ".chbuild" / "planner"
-        planner_dir.mkdir(parents=True, exist_ok=True)
+        scanner_dir = Path(repo_path) / ".chbuild" / "scanner"
+        scanner_dir.mkdir(parents=True, exist_ok=True)
 
-        plan_file = planner_dir / f"plan_{timestamp}.json"
-        plan_file.write_text(result_json)
+        scan_file = scanner_dir / f"scan_{timestamp}.json"
+        scan_file.write_text(result_json)
 
-        print_info(str(plan_file), label="Plan saved to")
+        print_info(str(scan_file), label="Scan saved to")
+
+        # Display log file location
+        log_file = get_current_log_file()
+        if log_file:
+            print_info(log_file, label="Logs saved to")
 
         # Flush Langfuse data
         langfuse_client = get_langfuse_client()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Planner script to run the code_planner agent on the test/pg-expense-direct project.
+Scanner script to run the code_scanner agent on the test/pg-expense-direct project.
 This script will analyze the repository and find all PostgreSQL analytical queries.
 """
 
@@ -17,7 +17,7 @@ load_dotenv()
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.agents.planner import agent_planner
+from src.agents.scanner import agent_scanner
 from src.logging_config import get_chbuild_logger
 from src.tui.logo import print_logo
 from src.utils import check_aws_credentials
@@ -48,9 +48,9 @@ def main():
     print()
 
     try:
-        agent_planner(repo_path)
+        agent_scanner(repo_path)
     except Exception as e:
-        logger.error(f"Error running code planner: {e}")
+        logger.error(f"Error running code scanner: {e}")
         print(f"\nError: {e}")
         sys.exit(1)
 
