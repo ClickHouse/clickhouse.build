@@ -21,6 +21,7 @@ class PrintingCallbackHandler:
         "bash_run": "Bash",
         "call_human": "CallHuman",
         "load_example": "LoadExample",
+        "create_clickpipe": "CreateClickPipe",
     }
 
     def __init__(self) -> None:

@@ -7,7 +7,7 @@ from strands import Agent
 from strands.models import BedrockModel
 
 from ..prompts.data_migrator import get_system_prompt
-from ..tools.data_migrator import data_migrator
+from ..tools.data_migrator import create_clickpipe
 from ..tui import (print_code, print_error, print_header, print_info,
                    print_summary_panel)
 from ..utils import check_aws_credentials, get_callback_handler
@@ -107,7 +107,7 @@ def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> st
             name="data_migrator",
             model=bedrock_model,
             system_prompt=get_system_prompt(repo_path),
-            tools=[data_migrator],
+            tools=[create_clickpipe],
             callback_handler=get_callback_handler(),
         )
 

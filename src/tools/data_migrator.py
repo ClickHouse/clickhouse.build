@@ -14,7 +14,7 @@ class ReplicationMode(Enum):
 
 
 @tool
-def data_migrator(
+def create_clickpipe(
     database_name: str,
     schema_tables: dict[str, list[str]],
     replication_mode: ReplicationMode = ReplicationMode.CDC,
@@ -33,7 +33,7 @@ def data_migrator(
         JSON configuration for setting up a ClickPipe data migration
     """
     logger.info(
-        f"Data migrator starting for database: {database_name}, tables: {schema_tables}"
+        f"create_clickpipe starting for database: {database_name}, tables: {schema_tables}"
     )
     try:
         table_mappings = []
@@ -93,5 +93,5 @@ If you have alternative networking requirements you can refer to this guide: htt
         return result
 
     except Exception as e:
-        logger.error(f"Error in data_migrator: {type(e).__name__}: {e}")
+        logger.error(f"Error in create_clickpipe: {type(e).__name__}: {e}")
         return f"Error creating ClickPipe configuration: {str(e)}"
