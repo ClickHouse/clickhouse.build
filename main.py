@@ -262,32 +262,41 @@ def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool)
 
     try:
         # Step 1: Run scanner
-        click.secho("\n[1/3] Running scanner agent...", fg="cyan", bold=True)
-        from src.agents.scanner import agent_scanner
-
-        agent_scanner(repo_path)
-        click.secho("✓ Scanner completed", fg="green")
+        click.secho("\n[1/3] Scanner agent", fg="cyan", bold=True)
+        response = click.prompt("Run scanner agent? (y/n)", type=click.Choice(["y", "n"]), default="y", show_choices=False)
+        if response == "y":
+            from src.agents.scanner import agent_scanner
+            agent_scanner(repo_path)
+            click.secho("✓ Scanner completed", fg="green")
+        else:
+            click.secho("Skipping scanner agent", fg="yellow")
 
         # Step 2: Run data migrator
         click.secho(
-            f"\n[2/3] Running data migrator agent (mode: {replication_mode})...",
+            f"\n[2/3] Data migrator agent (mode: {replication_mode})",
             fg="cyan",
             bold=True,
         )
-        from src.agents.data_migrator import run_data_migrator_agent
-
-        run_data_migrator_agent(repo_path, replication_mode=replication_mode)
-        click.secho("✓ Data migrator completed", fg="green")
+        response = click.prompt("Run data migrator agent? (y/n)", type=click.Choice(["y", "n"]), default="y", show_choices=False)
+        if response == "y":
+            from src.agents.data_migrator import run_data_migrator_agent
+            run_data_migrator_agent(repo_path, replication_mode=replication_mode)
+            click.secho("✓ Data migrator completed", fg="green")
+        else:
+            click.secho("Skipping data migrator agent", fg="yellow")
 
         # Step 3: Run code migrator
-        click.secho("\n[3/3] Running code migrator agent...", fg="cyan", bold=True)
-        from src.agents.code_migrator import agent_code_migrator
-
-        agent_code_migrator(repo_path)
-        click.secho("✓ Code migrator completed", fg="green")
+        click.secho("\n[3/3] Code migrator agent", fg="cyan", bold=True)
+        response = click.prompt("Run code migrator agent? (y/n)", type=click.Choice(["y", "n"]), default="y", show_choices=False)
+        if response == "y":
+            from src.agents.code_migrator import agent_code_migrator
+            agent_code_migrator(repo_path)
+            click.secho("✓ Code migrator completed", fg="green")
+        else:
+            click.secho("Skipping code migrator agent", fg="yellow")
 
         click.secho(
-            "\n✓ Complete migration workflow finished successfully!",
+            "\n✓ Migration workflow completed!",
             fg="green",
             bold=True,
         )
