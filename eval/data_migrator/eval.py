@@ -229,7 +229,7 @@ def main():
     if not creds_available:
         print(f"Error: {error_message}")
         sys.exit(1)
-    print("✓ AWS credentials found and valid\n")
+    print("✓ AWS credentials loaded\n")
 
     # Load ground truth
     eval_dir = Path(__file__).parent

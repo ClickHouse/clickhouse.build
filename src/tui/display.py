@@ -21,7 +21,11 @@ def print_header(title: str, subtitle: str = "") -> None:
     console.print()
     console.rule(f"[bold cyan]{title}[/bold cyan]", align="left")
     if subtitle:
-        console.print(f"[dim]{subtitle}[/dim]\n")
+        if subtitle.startswith("Repository: "):
+            repo_path = subtitle.replace("Repository: ", "")
+            console.print(f"[dim]Repository: [yellow]{repo_path}[/yellow][/dim]\n")
+        else:
+            console.print(f"[dim]{subtitle}[/dim]\n")
     else:
         console.print()
 
@@ -33,6 +37,7 @@ def print_summary_panel(data: Dict[str, Any], title: str = "Summary") -> None:
         data: Dictionary of key-value pairs to display
         title: Panel title
     """
+    console.log("\n\n")
     summary_text = Text()
     for i, (key, value) in enumerate(data.items()):
         if i > 0:

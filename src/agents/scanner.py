@@ -104,6 +104,7 @@ def agent_scanner(repo_path: str) -> str:
                 "Total Tables": result.total_tables,
                 "Execution Time": f"{elapsed_time:.2f}s ({elapsed_time/60:.2f}m)",
             }
+
             print_summary_panel(summary_data, title="Analysis Summary")
 
             if result.tables:

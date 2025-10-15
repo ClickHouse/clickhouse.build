@@ -57,7 +57,6 @@ Validate and return JSON with approval decision and reason.
         result = qa_agent(prompt)
         result_str = str(result)
 
-        # Strip markdown code blocks if present
         result_str = result_str.strip()
         if result_str.startswith("```json"):
             result_str = result_str[7:]

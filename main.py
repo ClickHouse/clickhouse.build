@@ -48,12 +48,14 @@ logger = logging.getLogger(__name__)
 @click.pass_context
 def main(ctx):
     """An agentic Postgres -> ClickHouse migration tool."""
-    print_logo()
-
-    # If no subcommand is provided, show help
+    # Only print logo if no subcommand is provided
     if ctx.invoked_subcommand is None:
+        print_logo()
         click.echo(ctx.get_help())
         click.echo()  # Add extra newline for spacing
+    else:
+        # Print logo for subcommands
+        print_logo()
 
 
 @main.command()
@@ -80,7 +82,7 @@ def scanner(repo_path: str, skip_credentials_check: bool):
         if not creds_available:
             click.secho(f"Error: {error_message}", fg="red", err=True)
             sys.exit(1)
-        click.secho("✓ AWS credentials found and valid\n", fg="green")
+        click.secho("✓ AWS credentials loaded\n", fg="green")
 
     repo_path = os.path.abspath(repo_path)
 
@@ -89,10 +91,6 @@ def scanner(repo_path: str, skip_credentials_check: bool):
             f"Error: Repository path does not exist: {repo_path}", fg="red", err=True
         )
         sys.exit(1)
-
-    click.echo(f"Analyzing repository: {repo_path}")
-    click.echo("=" * 60)
-    click.echo()
 
     try:
         from src.agents.scanner import agent_scanner
@@ -123,15 +121,13 @@ def code_migrator(repo_path: str, skip_credentials_check: bool):
 
     REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
     """
-    print_logo()
-
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
         creds_available, error_message = check_aws_credentials()
         if not creds_available:
             click.secho(f"Error: {error_message}", fg="red", err=True)
             sys.exit(1)
-        click.secho("✓ AWS credentials found and valid\n", fg="green")
+        click.secho("✓ AWS credentials loaded\n", fg="green")
 
     repo_path = os.path.abspath(repo_path)
 
@@ -140,10 +136,6 @@ def code_migrator(repo_path: str, skip_credentials_check: bool):
             f"Error: Repository path does not exist: {repo_path}", fg="red", err=True
         )
         sys.exit(1)
-
-    click.echo(f"Analyzing repository: {repo_path}")
-    click.echo("=" * 60)
-    click.echo()
 
     try:
         from src.agents.code_migrator import agent_code_migrator
@@ -180,15 +172,13 @@ def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check:
 
     REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
     """
-    print_logo()
-
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
         creds_available, error_message = check_aws_credentials()
         if not creds_available:
             click.secho(f"Error: {error_message}", fg="red", err=True)
             sys.exit(1)
-        click.secho("✓ AWS credentials found and valid\n", fg="green")
+        click.secho("✓ AWS credentials loaded\n", fg="green")
 
     repo_path = os.path.abspath(repo_path)
 
@@ -197,11 +187,6 @@ def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check:
             f"Error: Repository path does not exist: {repo_path}", fg="red", err=True
         )
         sys.exit(1)
-
-    click.echo(f"Analyzing repository: {repo_path}")
-    click.echo(f"Replication mode: {replication_mode}")
-    click.echo("=" * 60)
-    click.echo()
 
     try:
         from src.agents.data_migrator import run_data_migrator_agent
@@ -238,15 +223,13 @@ def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool)
 
     REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
     """
-    print_logo()
-
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
         creds_available, error_message = check_aws_credentials()
         if not creds_available:
             click.secho(f"Error: {error_message}", fg="red", err=True)
             sys.exit(1)
-        click.secho("✓ AWS credentials found and valid\n", fg="green")
+        click.secho("✓ AWS credentials loaded\n", fg="green")
 
     repo_path = os.path.abspath(repo_path)
 
@@ -255,10 +238,6 @@ def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool)
             f"Error: Repository path does not exist: {repo_path}", fg="red", err=True
         )
         sys.exit(1)
-
-    click.echo(f"Analyzing repository: {repo_path}")
-    click.echo("=" * 60)
-    click.echo()
 
     try:
         # Step 1: Run scanner
@@ -336,8 +315,6 @@ def eval(agent: str):
 
     AGENT: The agent to evaluate (scanner or data-migrator)
     """
-    print_logo()
-
     click.secho(f"\nRunning {agent} evaluation...\n", fg="cyan", bold=True)
 
     eval_dir = Path(__file__).parent / "eval" / agent.replace("-", "_")

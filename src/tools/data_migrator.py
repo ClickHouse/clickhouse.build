@@ -89,9 +89,6 @@ If you have alternative networking requirements you can refer to this guide: htt
 
         return json.dumps({"info": info_text, "command": curl_command})
 
-        logger.info(f"Final result: {result}")
-        return result
-
     except Exception as e:
         logger.error(f"Error in create_clickpipe: {type(e).__name__}: {e}")
         return f"Error creating ClickPipe configuration: {str(e)}"

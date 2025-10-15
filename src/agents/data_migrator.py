@@ -1,12 +1,14 @@
 import json
 import logging
 import time
+from datetime import datetime
 from pathlib import Path
 
 from langfuse import observe
 from strands import Agent
 from strands.models import BedrockModel
 
+from ..logging_config import get_current_log_file
 from ..prompts.data_migrator import get_system_prompt
 from ..tools.data_migrator import create_clickpipe
 from ..tui import (print_code, print_error, print_header, print_info,
@@ -20,7 +22,7 @@ logger = logging.getLogger(__name__)
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
-def get_latest_scan(repo_path: str) -> dict:
+def get_latest_scan(repo_path: str) -> tuple[dict, Path]:
     """
     Get the most recent scan file from the repository.
 
@@ -28,7 +30,7 @@ def get_latest_scan(repo_path: str) -> dict:
         repo_path: Path to the repository
 
     Returns:
-        dict: The parsed scan JSON
+        tuple[dict, Path]: The parsed scan JSON and the path to the scan file
 
     Raises:
         FileNotFoundError: If no scan files exist
@@ -54,7 +56,7 @@ def get_latest_scan(repo_path: str) -> dict:
     logger.info(f"Reading latest scan: {latest_scan.name}")
 
     with open(latest_scan, "r") as f:
-        return json.load(f)
+        return json.load(f), latest_scan
 
 
 @observe(name="agent_data_migrator")
@@ -82,13 +84,13 @@ def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> st
         # Try to get the latest scan, run scanner if none exists
         try:
             print_info("Loading scan data...", label="Step 1")
-            scan_data = get_latest_scan(repo_path)
+            scan_data, scan_file_path = get_latest_scan(repo_path)
         except FileNotFoundError:
             logger.info("No existing scan found, running scanner agent first...")
             print_info("No existing scan found, running scanner first", label="Notice")
             agent_scanner(repo_path)
             # Now get the scan that was just created
-            scan_data = get_latest_scan(repo_path)
+            scan_data, scan_file_path = get_latest_scan(repo_path)
 
         logger.info(
             f"Loaded scan with {scan_data.get('total_tables', 0)} tables and {scan_data.get('total_queries', 0)} queries"
@@ -129,17 +131,25 @@ Return JSON with "assumptions" list and "config" object as specified in system p
         end_time = time.time()
         elapsed_time = end_time - start_time
 
-        # Display results
-        result_str = str(result)
+        result_str = str(result).strip()
+        if result_str.startswith("```json"):
+            result_str = result_str[7:]
+        elif result_str.startswith("```"):
+            result_str = result_str[3:]
+        if result_str.endswith("```"):
+            result_str = result_str[:-3]
+        result_str = result_str.strip()
 
         try:
             result_data = json.loads(result_str)
+            print("got data")
 
             # Display execution time
             exec_summary = {
                 "Execution Time": f"{elapsed_time:.2f}s ({elapsed_time/60:.2f}m)",
                 "Status": "Success",
             }
+            print("\n\n")
             print_summary_panel(exec_summary, title="Execution Summary")
 
             # Display assumptions if any
@@ -174,6 +184,21 @@ Return JSON with "assumptions" list and "config" object as specified in system p
             # If result is not JSON, just display it as is
             print_info("Result generated successfully", label="Step 3")
 
+        # Save results to file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        data_migrator_dir = Path(repo_path) / ".chbuild" / "data_migrator"
+        data_migrator_dir.mkdir(parents=True, exist_ok=True)
+
+        result_file = data_migrator_dir / f"result_{timestamp}.json"
+        result_file.write_text(result_str)
+
+        print_info(str(scan_file_path), label="Input file")
+        print_info(str(result_file), label="Results saved to")
+
+        log_file = get_current_log_file()
+        if log_file:
+            print_info(log_file, label="Logs saved to")
+
         # Flush Langfuse data
         langfuse_client = get_langfuse_client()
         if langfuse_client:
@@ -185,7 +210,6 @@ Return JSON with "assumptions" list and "config" object as specified in system p
         logger.error(f"File not found: {str(e)}")
         print_error(str(e))
 
-        # Flush Langfuse data
         langfuse_client = get_langfuse_client()
         if langfuse_client:
             langfuse_client.flush()
@@ -195,7 +219,6 @@ Return JSON with "assumptions" list and "config" object as specified in system p
         logger.error(f"Exception in data_migrator_agent: {type(e).__name__}: {e}")
         print_error(str(e))
 
-        # Flush Langfuse data
         langfuse_client = get_langfuse_client()
         if langfuse_client:
             langfuse_client.flush()

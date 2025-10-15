@@ -87,7 +87,6 @@ def agent_code_migrator(repo_path: str) -> str:
             "Execution Time": f"{elapsed_time:.2f}s ({elapsed_time/60:.2f}m)",
             "Status": "Success",
         }
-        print()
         print_summary_panel(exec_summary, title="Execution Summary")
 
         result_str = str(result)

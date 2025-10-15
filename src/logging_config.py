@@ -424,8 +424,14 @@ def get_chbuild_logger() -> tuple[logging.Logger, str]:
         log_dir = Path.home() / ".chbuild" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
 
+    agent_name = "chbuild"
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1]
+        if cmd in ["scanner", "code-migrator", "data-migrator", "migrate", "eval"]:
+            agent_name = cmd.replace("-", "_")
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_dir / f"scanner_{timestamp}.log"
+    log_file = log_dir / f"{agent_name}_{timestamp}.log"
 
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(logging.INFO)  # Capture INFO level and above to file
