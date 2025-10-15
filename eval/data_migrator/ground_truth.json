@@ -1,0 +1,64 @@
+{
+  "test_cases": [
+    {
+      "name": "pg-expense-direct",
+      "repo_path": "test/pg-expense-direct",
+      "replication_mode": "cdc",
+      "expected": {
+        "database_name": "postgres",
+        "destination_database": "postgres",
+        "replication_mode": "cdc",
+        "schema_tables": {
+          "public": ["expenses"]
+        },
+        "table_mappings": [
+          {
+            "sourceSchemaName": "public",
+            "sourceTable": "expenses",
+            "targetTable": "expenses"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pg-expense-drizzleorm",
+      "repo_path": "test/pg-expense-drizzleorm",
+      "replication_mode": "cdc",
+      "expected": {
+        "database_name": "postgres",
+        "destination_database": "postgres",
+        "replication_mode": "cdc",
+        "schema_tables": {
+          "public": ["expenses"]
+        },
+        "table_mappings": [
+          {
+            "sourceSchemaName": "public",
+            "sourceTable": "expenses",
+            "targetTable": "expenses"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pg-expense-prisma",
+      "repo_path": "test/pg-expense-prisma",
+      "replication_mode": "cdc",
+      "expected": {
+        "database_name": "postgres",
+        "destination_database": "postgres",
+        "replication_mode": "cdc",
+        "schema_tables": {
+          "public": ["expenses"]
+        },
+        "table_mappings": [
+          {
+            "sourceSchemaName": "public",
+            "sourceTable": "expenses",
+            "targetTable": "expenses"
+          }
+        ]
+      }
+    }
+  ]
+}

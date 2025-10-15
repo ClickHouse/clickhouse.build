@@ -1,0 +1,27 @@
+{
+  "tables": ["expenses"],
+  "total_tables": 1,
+  "total_queries": 4,
+  "queries": [
+    {
+      "description": "Get total expense count and sum of amounts with optional date filtering",
+      "code": "SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM expenses ${whereClause}",
+      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-direct/app/api/expenses/stats/route.ts:L28"
+    },
+    {
+      "description": "Aggregate expenses by category showing count and total amount per category",
+      "code": "SELECT\n        COALESCE(category, 'Uncategorized') as category,\n        COUNT(*) as count,\n        SUM(amount) as total\n       FROM expenses ${whereClause}\n       GROUP BY category\n       ORDER BY total DESC",
+      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-direct/app/api/expenses/stats/route.ts:L34-40"
+    },
+    {
+      "description": "Monthly expense aggregation using DATE_TRUNC for time-based analytics",
+      "code": "SELECT\n        DATE_TRUNC('month', date) as month,\n        COUNT(*) as count,\n        SUM(amount) as total\n       FROM expenses ${whereClause}\n       GROUP BY DATE_TRUNC('month', date)\n       ORDER BY month DESC",
+      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-direct/app/api/expenses/stats/route.ts:L46-52"
+    },
+    {
+      "description": "Daily expense aggregation for recent activity analysis (limited to last 30 days)",
+      "code": "SELECT\n        date,\n        COUNT(*) as count,\n        SUM(amount) as total\n       FROM expenses ${whereClause}\n       GROUP BY date\n       ORDER BY date DESC\n       LIMIT 30",
+      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-direct/app/api/expenses/stats/route.ts:L58-65"
+    }
+  ]
+}

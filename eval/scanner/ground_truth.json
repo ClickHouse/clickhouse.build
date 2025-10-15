@@ -1,0 +1,97 @@
+{
+  "test_cases": [
+    {
+      "name": "pg-expense-direct",
+      "repo_path": "test/pg-expense-direct",
+      "expected": {
+        "total_tables": 1,
+        "total_queries": 4,
+        "tables": ["expenses"],
+        "queries": [
+          {
+            "description": "Total expenses aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L27-30",
+            "query_type": "raw_sql"
+          },
+          {
+            "description": "Expenses by category",
+            "location": "/app/api/expenses/stats/route.ts:L33-42",
+            "query_type": "raw_sql"
+          },
+          {
+            "description": "Monthly expenses aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L45-54",
+            "query_type": "raw_sql"
+          },
+          {
+            "description": "Daily expenses aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L57-67",
+            "query_type": "raw_sql"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pg-expense-drizzleorm",
+      "repo_path": "test/pg-expense-drizzleorm",
+      "expected": {
+        "total_tables": 1,
+        "total_queries": 4,
+        "tables": ["expenses"],
+        "queries": [
+          {
+            "description": "Total expenses count and sum",
+            "location": "/app/api/expenses/stats/route.ts:L27-30",
+            "query_type": "orm"
+          },
+          {
+            "description": "Expenses by category",
+            "location": "/app/api/expenses/stats/route.ts:L35-41",
+            "query_type": "orm"
+          },
+          {
+            "description": "Monthly expenses",
+            "location": "/app/api/expenses/stats/route.ts:L45-52",
+            "query_type": "orm"
+          },
+          {
+            "description": "Daily expenses",
+            "location": "/app/api/expenses/stats/route.ts:L57-62",
+            "query_type": "orm"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pg-expense-prisma",
+      "repo_path": "test/pg-expense-prisma",
+      "expected": {
+        "total_tables": 1,
+        "total_queries": 4,
+        "tables": ["expenses"],
+        "queries": [
+          {
+            "description": "Total expenses aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L21-25",
+            "query_type": "orm"
+          },
+          {
+            "description": "Category aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L28-34",
+            "query_type": "orm"
+          },
+          {
+            "description": "Monthly aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L37-60",
+            "query_type": "orm"
+          },
+          {
+            "description": "Daily aggregation",
+            "location": "/app/api/expenses/stats/route.ts:L69-76",
+            "query_type": "orm"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 [project]
 name = "clickhouse-build"
-version = "0.1.0"
+version = "1.0.0"
 description = "PostgreSQL to ClickHouse Migration Tool with AI-powered query conversion"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -11,10 +11,13 @@ dependencies = [
     "notebook",
     "semver>=3.0.4",
     "pyyaml",
-    "click>=8.2.1",
-    "questionary>=2.1.1",
     "rich>=14.1.0",
     "textual>=6.1.0",
+    "langfuse>=3.6.2",
+    "python-dotenv>=1.0.0",
+    "colorlog>=6.9.0",
+    "click>=8.2.1",
+    "rich-click>=1.9.3",
 ]
 
 [project.scripts]

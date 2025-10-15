@@ -1,0 +1,64 @@
+{
+  "test_cases": [
+    {
+      "name": "valid_typescript_with_proper_types",
+      "description": "Valid TypeScript code with explicit types and proper patterns",
+      "file_path": "lib/database.ts",
+      "purpose": "Database connection implementation with strategy pattern",
+      "code": "import { Pool } from 'pg';\n\ninterface DatabaseConfig {\n  host: string;\n  port: number;\n  database: string;\n}\n\ninterface DatabaseConnection {\n  query(sql: string, params: string[]): Promise<QueryResult>;\n  close(): Promise<void>;\n}\n\ninterface QueryResult {\n  rows: Record<string, string | number>[];\n  rowCount: number;\n}\n\nclass PostgresConnection implements DatabaseConnection {\n  private pool: Pool;\n\n  constructor(config: DatabaseConfig) {\n    this.pool = new Pool(config);\n  }\n\n  async query(sql: string, params: string[]): Promise<QueryResult> {\n    const result = await this.pool.query(sql, params);\n    return {\n      rows: result.rows,\n      rowCount: result.rowCount || 0\n    };\n  }\n\n  async close(): Promise<void> {\n    await this.pool.end();\n  }\n}\n\nexport function createConnection(config: DatabaseConfig): DatabaseConnection {\n  const useClickHouse = process.env.USE_CLICKHOUSE === 'true';\n  return new PostgresConnection(config);\n}",
+      "expected": {
+        "approved": true
+      }
+    },
+    {
+      "name": "code_with_any_type",
+      "description": "Code that uses 'any' type which should be rejected",
+      "file_path": "lib/handler.ts",
+      "purpose": "Request handler implementation",
+      "code": "import { Request, Response } from 'express';\n\nexport async function handleRequest(req: Request, res: Response): Promise<void> {\n  const data: any = req.body;\n  const result = await processData(data);\n  res.json(result);\n}\n\nfunction processData(input: any): Promise<any> {\n  return Promise.resolve(input);\n}",
+      "expected": {
+        "approved": false
+      }
+    },
+    {
+      "name": "code_with_unknown_type",
+      "description": "Code that uses 'unknown' type without proper narrowing",
+      "file_path": "lib/parser.ts",
+      "purpose": "JSON parser implementation",
+      "code": "export function parseJSON(input: string): unknown {\n  const parsed: unknown = JSON.parse(input);\n  return parsed;\n}\n\nexport function processUnknown(data: unknown): string {\n  return data.toString();\n}",
+      "expected": {
+        "approved": false
+      }
+    },
+    {
+      "name": "missing_env_check",
+      "description": "Code missing USE_CLICKHOUSE environment variable check",
+      "file_path": "lib/query-router.ts",
+      "purpose": "Query routing logic",
+      "code": "import { ClickHouseClient, createClient } from '@clickhouse/client';\n\ninterface QueryRouter {\n  route(query: string): Promise<QueryResult>;\n}\n\ninterface QueryResult {\n  rows: Record<string, string | number>[];\n}\n\nexport class DatabaseRouter implements QueryRouter {\n  private clickhouse: ClickHouseClient;\n\n  constructor() {\n    this.clickhouse = createClient({ host: 'http://localhost:8123' });\n  }\n\n  async route(query: string): Promise<QueryResult> {\n    const result = await this.clickhouse.query({ query });\n    return { rows: await result.json() };\n  }\n}",
+      "expected": {
+        "approved": false
+      }
+    },
+    {
+      "name": "simple_api_code",
+      "description": "Simple API code with proper types",
+      "file_path": "lib/api.ts",
+      "purpose": "API endpoint implementation",
+      "code": "export async function fetchData(id: number): Promise<string> {\n  const response = await fetch(`/api/data/${id}`);\n  const json = await response.json();\n  return json.data;\n}\n\nexport function processRecord(id: number): void {\n  console.log(`Processing ${id}`);\n}",
+      "expected": {
+        "approved": true
+      }
+    },
+    {
+      "name": "valid_strategy_pattern",
+      "description": "Valid implementation with strategy pattern and env checks",
+      "file_path": "lib/db-strategy.ts",
+      "purpose": "Database strategy pattern with environment-based routing",
+      "code": "import { Pool } from 'pg';\nimport { ClickHouseClient, createClient } from '@clickhouse/client';\n\ninterface DatabaseStrategy {\n  query(sql: string, params: string[]): Promise<QueryResult>;\n  close(): Promise<void>;\n}\n\ninterface QueryResult {\n  rows: Record<string, string | number>[];\n  rowCount: number;\n}\n\nclass PostgresStrategy implements DatabaseStrategy {\n  private pool: Pool;\n\n  constructor(connectionString: string) {\n    this.pool = new Pool({ connectionString });\n  }\n\n  async query(sql: string, params: string[]): Promise<QueryResult> {\n    const result = await this.pool.query(sql, params);\n    return { rows: result.rows, rowCount: result.rowCount || 0 };\n  }\n\n  async close(): Promise<void> {\n    await this.pool.end();\n  }\n}\n\nclass ClickHouseStrategy implements DatabaseStrategy {\n  private client: ClickHouseClient;\n\n  constructor(config: { host: string }) {\n    this.client = createClient(config);\n  }\n\n  async query(sql: string, params: string[]): Promise<QueryResult> {\n    const result = await this.client.query({ query: sql, query_params: params });\n    const rows = await result.json<Record<string, string | number>[]>();\n    return { rows, rowCount: rows.length };\n  }\n\n  async close(): Promise<void> {\n    await this.client.close();\n  }\n}\n\nexport function createDatabaseStrategy(config: string | { host: string }): DatabaseStrategy {\n  const useClickHouse = process.env.USE_CLICKHOUSE === 'true';\n  if (useClickHouse && typeof config === 'object') {\n    return new ClickHouseStrategy(config);\n  }\n  const connectionString = typeof config === 'string' ? config : 'postgresql://localhost';\n  return new PostgresStrategy(connectionString);\n}",
+      "expected": {
+        "approved": true
+      }
+    }
+  ]
+}

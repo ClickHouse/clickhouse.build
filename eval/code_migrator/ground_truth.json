@@ -1,0 +1,28 @@
+{
+  "test_cases": [
+    {
+      "name": "pg-expense-direct",
+      "repo_path": "test/pg-expense-direct",
+      "expected": {
+        "status": "success",
+        "message": "Hello World! Code migrator is ready."
+      }
+    },
+    {
+      "name": "pg-expense-drizzleorm",
+      "repo_path": "test/pg-expense-drizzleorm",
+      "expected": {
+        "status": "success",
+        "message": "Hello World! Code migrator is ready."
+      }
+    },
+    {
+      "name": "pg-expense-prisma",
+      "repo_path": "test/pg-expense-prisma",
+      "expected": {
+        "status": "success",
+        "message": "Hello World! Code migrator is ready."
+      }
+    }
+  ]
+}

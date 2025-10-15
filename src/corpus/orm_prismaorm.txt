@@ -1,0 +1,784 @@
+<EVALUATION type="expert">
+  <score>5/5</score>
+
+	<comment>
+		This is a very good port of prisma analytical queries being ported.
+		The OLTP queries were not ported as expected.
+		The agent created a clean and backward compatible abstraction.
+		It did minimal changes and used strong types.
+		This can be used as a high level inspiration for the codebase you are about to migrate
+	</comment>
+</EVALUATION>
+
+
+<file type="new" name="lib/strategies/postgres.ts">
+</file>
+
+===
+
+<file type="diff" modified="true">
+diff --git a/test/pg-expense-prisma/app/api/expenses/route.ts b/test/pg-expense-prisma/app/api/expenses/route.ts
+index 0395850..bcb1064 100644
+--- a/test/pg-expense-prisma/app/api/expenses/route.ts
++++ b/test/pg-expense-prisma/app/api/expenses/route.ts
+@@ -1,6 +1,11 @@
+ import { NextRequest, NextResponse } from 'next/server';
+-import prisma from '@/lib/db';
++import { dbStrategy } from '@/lib/db';
+ import { Decimal } from '@prisma/client/runtime/library';
++import { QueryParams } from '@/lib/types';
++
++// Import Prisma client directly for OLTP operations
++import { PrismaClient } from '@prisma/client';
++const prismaForWrites = new PrismaClient();
+
+ export async function POST(request: NextRequest) {
+   try {
+@@ -13,7 +18,9 @@ export async function POST(request: NextRequest) {
+       );
+     }
+
+-    const expense = await prisma.expense.create({
++    // ALWAYS use Prisma for CREATE operations (OLTP)
++    // ClickHouse is not designed for transactional writes
++    const expense = await prismaForWrites.expense.create({
+       data: {
+         description,
+         amount: new Decimal(amount),
+@@ -33,37 +40,33 @@ export async function POST(request: NextRequest) {
+ }
+
+ export async function GET(request: NextRequest) {
++  const { searchParams } = new URL(request.url);
++  const startDate = searchParams.get('startDate');
++  const endDate = searchParams.get('endDate');
++  const category = searchParams.get('category');
++
++  const filter: QueryParams = {
++    startDate: startDate || undefined,
++    endDate: endDate || undefined,
++    category: category || undefined
++  };
++
+   try {
+-    const { searchParams } = new URL(request.url);
+-    const startDate = searchParams.get('startDate');
+-    const endDate = searchParams.get('endDate');
+-    const category = searchParams.get('category');
+-
+-    const where: any = {};
+-
+-    if (startDate) {
+-      where.date = { ...where.date, gte: new Date(startDate) };
+-    }
+-
+-    if (endDate) {
+-      where.date = { ...where.date, lte: new Date(endDate) };
+-    }
+-
+-    if (category) {
+-      where.category = category;
+-    }
+-
+-    const expenses = await prisma.expense.findMany({
+-      where,
+-      orderBy: [
+-        { date: 'desc' },
+-        { createdAt: 'desc' }
+-      ]
+-    });
++    // Use strategy pattern for READ operations (can use ClickHouse for OLAP)
++    const expenses = await dbStrategy.getAllExpenses(filter);
+
+     return NextResponse.json(expenses);
+   } catch (error) {
+     console.error('Error fetching expenses:', error);
++
++    // Enhanced error reporting for ClickHouse issues
++    if (process.env.USE_CLICKHOUSE === 'true') {
++      console.error('ClickHouse query error details:', {
++        filter,
++        error: error instanceof Error ? error.message : 'Unknown error'
++      });
++    }
++
+     return NextResponse.json(
+       { error: 'Internal server error' },
+       { status: 500 }
+(END)
+</file>
+
+<file type="diff" modified="true">
+diff --git a/test/pg-expense-prisma/app/api/expenses/stats/route.ts b/test/pg-expense-prisma/app/api/expenses/stats/route.ts
+index 86b27e4..70adb1a 100644
+--- a/test/pg-expense-prisma/app/api/expenses/stats/route.ts
++++ b/test/pg-expense-prisma/app/api/expenses/stats/route.ts
+@@ -1,5 +1,6 @@
+ import { NextRequest, NextResponse } from 'next/server';
+-import prisma from '@/lib/db';
++import { dbStrategy } from '@/lib/db';
++import { DateFilter, ExpenseStats } from '@/lib/types';
+
+ export async function GET(request: NextRequest) {
+   try {
+@@ -7,99 +8,37 @@ export async function GET(request: NextRequest) {
+     const startDate = searchParams.get('startDate');
+     const endDate = searchParams.get('endDate');
+
+-    const where: any = {};
+-
+-    if (startDate) {
+-      where.date = { ...where.date, gte: new Date(startDate) };
+-    }
+-
+-    if (endDate) {
+-      where.date = { ...where.date, lte: new Date(endDate) };
+-    }
+-
+-    // Total expenses
+-    const totalStats = await prisma.expense.aggregate({
+-      where,
+-      _count: { id: true },
+-      _sum: { amount: true }
+-    });
+-
+-    // Expenses by category
+-    const categoryStats = await prisma.expense.groupBy({
+-      by: ['category'],
+-      where,
+-      _count: { id: true },
+-      _sum: { amount: true },
+-      orderBy: { _sum: { amount: 'desc' } }
+-    });
+-
+-    // Monthly aggregation using raw SQL for DATE_TRUNC
+-    let monthlyQuery = `
+-      SELECT
+-        DATE_TRUNC('month', date) as month,
+-        COUNT(*) as count,
+-        SUM(amount) as total
+-      FROM expenses
+-      WHERE 1=1
+-    `;
+-    const queryParams: any[] = [];
+-
+-    if (startDate) {
+-      queryParams.push(startDate);
+-      monthlyQuery += ` AND date >= $${queryParams.length}`;
+-    }
+-
+-    if (endDate) {
+-      queryParams.push(endDate);
+-      monthlyQuery += ` AND date <= $${queryParams.length}`;
+-    }
+-
+-    monthlyQuery += `
+-      GROUP BY DATE_TRUNC('month', date)
+-      ORDER BY month DESC
+-    `;
+-
+-    const monthlyStats = await prisma.$queryRawUnsafe<Array<{
+-      month: Date;
+-      count: bigint;
+-      total: number;
+-    }>>(monthlyQuery, ...queryParams);
+-
+-    // Daily aggregation
+-    const dailyStats = await prisma.expense.groupBy({
+-      by: ['date'],
+-      where,
+-      _count: { id: true },
+-      _sum: { amount: true },
+-      orderBy: { date: 'desc' },
+-      take: 30
+-    });
+-
+-    const stats = {
+-      total: {
+-        count: totalStats._count.id,
+-        amount: totalStats._sum.amount ? Number(totalStats._sum.amount) : 0
+-      },
+-      byCategory: categoryStats.map(stat => ({
+-        category: stat.category || 'Uncategorized',
+-        count: stat._count.id,
+-        total: stat._sum.amount ? Number(stat._sum.amount) : 0
+-      })),
+-      byMonth: monthlyStats.map(stat => ({
+-        month: stat.month,
+-        count: Number(stat.count),
+-        total: Number(stat.total)
+-      })),
+-      daily: dailyStats.map(stat => ({
+-        date: stat.date,
+-        count: stat._count.id,
+-        total: stat._sum.amount ? Number(stat._sum.amount) : 0
+-      }))
++    const filter: DateFilter = {
++      startDate: startDate || undefined,
++      endDate: endDate || undefined
++    };
++
++    // Use strategy pattern to get all stats in parallel
++    const [totalStats, categoryStats, monthlyStats, dailyStats] = await Promise.all([
++      dbStrategy.getTotalStats(filter),
++      dbStrategy.getCategoryStats(filter),
++      dbStrategy.getMonthlyStats(filter),
++      dbStrategy.getDailyStats(filter)
++    ]);
++
++    const stats: ExpenseStats = {
++      total: totalStats,
++      byCategory: categoryStats,
++      byMonth: monthlyStats,
++      daily: dailyStats
+     };
+
+     return NextResponse.json(stats);
+   } catch (error) {
+     console.error('Error fetching expense stats:', error);
++
++    // Enhanced error reporting for ClickHouse issues
++    if (process.env.USE_CLICKHOUSE === 'true') {
++      console.error('ClickHouse query error details:', {
++        error: error instanceof Error ? error.message : 'Unknown error'
++      });
++    }
++
+     return NextResponse.json(
+       { error: 'Internal server error' },
+       { status: 500 }
+(END)
+</file>
+
+<file type="diff" modified="true">
+diff --git a/test/pg-expense-prisma/lib/db.ts b/test/pg-expense-prisma/lib/db.ts
+index e9c471e..b8badbe 100644
+--- a/test/pg-expense-prisma/lib/db.ts
++++ b/test/pg-expense-prisma/lib/db.ts
+@@ -1,15 +1,36 @@
+-import { PrismaClient } from '@prisma/client'
++import { PrismaClient } from '@prisma/client';
++import { DatabaseStrategy } from './types';
++import { PrismaStrategy } from './strategies/prisma';
++import { ClickHouseStrategy } from './strategies/clickhouse';
+
++// Global Prisma setup (unchanged from original)
+ const globalForPrisma = globalThis as unknown as {
+-  prisma: PrismaClient | undefined
+-}
++  prisma: PrismaClient | undefined;
++};
+
+ const prisma =
+   globalForPrisma.prisma ??
+   new PrismaClient({
+     log: ['query'],
+-  })
++  });
+
+-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
++if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+-export default prisma
+\ No newline at end of file
++// Strategy pattern for database operations
++function createDatabaseStrategy(): DatabaseStrategy {
++  const useClickHouse = process.env.USE_CLICKHOUSE === 'true';
++
++  if (useClickHouse) {
++    console.log('🚀 Using ClickHouse strategy for OLAP queries');
++    return new ClickHouseStrategy();
++  } else {
++    console.log('🐘 Using Prisma/PostgreSQL strategy for all queries');
++    return new PrismaStrategy(prisma);
++  }
++}
++
++// Export the strategy instance
++export const dbStrategy = createDatabaseStrategy();
++
++// Export Prisma client for direct use if needed (backwards compatibility)
++export default prisma;
+\ No newline at end of file
+(END)
+</file>
+
+<file type="new" name="lib/clickhouse.ts">
+import { createClient, ClickHouseClient } from '@clickhouse/client';
+
+let clickhouseClient: ClickHouseClient | null = null;
+
+export function getClickHouseClient(): ClickHouseClient {
+  if (!clickhouseClient) {
+    clickhouseClient = createClient({
+      url: `https://${process.env.CLICKHOUSE_HOST}` || 'http://localhost:8123',
+      username: process.env.CLICKHOUSE_USER || 'default',
+      password: process.env.CLICKHOUSE_PASSWORD || '',
+      database: process.env.CLICKHOUSE_DATABASE || 'default',
+    });
+  }
+  return clickhouseClient;
+}
+
+// Helper function to execute ClickHouse queries with proper error handling
+export async function executeClickHouseQuery<T = Record<string, unknown>>(
+  query: string,
+  params: Record<string, unknown> = {}
+): Promise<T[]> {
+  const client = getClickHouseClient();
+
+  try {
+    const result = await client.query({
+      query,
+      query_params: params,
+      format: 'JSONEachRow'
+    });
+
+    const data = await result.json() as unknown;
+    return Array.isArray(data) ? (data as T[]) : [];
+  } catch (error) {
+    console.error('ClickHouse query error:', {
+      query,
+      params,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+}
+</file>
+
+<file type="new" name="lib/types.ts">
+// Type definitions for expense application with Prisma and ClickHouse support
+
+import { Expense as PrismaExpense } from '@prisma/client';
+
+// Core expense type - compatible with both Prisma and ClickHouse
+export interface Expense {
+  id: number;
+  description: string;
+  amount: number;
+  category: string | null;
+  date: Date;
+  createdAt?: Date; // Optional for ClickHouse compatibility
+}
+
+// Convert Prisma Expense to our standard Expense type
+export function prismaToExpense(prismaExpense: PrismaExpense): Expense {
+  return {
+    id: prismaExpense.id,
+    description: prismaExpense.description,
+    amount: Number(prismaExpense.amount),
+    category: prismaExpense.category,
+    date: prismaExpense.date,
+    createdAt: prismaExpense.createdAt
+  };
+}
+
+export interface StatsTotal {
+  count: number;
+  amount: number;
+}
+
+export interface CategoryStats {
+  category: string;
+  count: number;
+  total: number;
+}
+
+export interface MonthlyStats {
+  month: Date | string; // Date for Prisma, string for ClickHouse
+  count: number;
+  total: number;
+}
+
+export interface DailyStats {
+  date: Date;
+  count: number;
+  total: number;
+}
+
+export interface ExpenseStats {
+  total: StatsTotal;
+  byCategory: CategoryStats[];
+  byMonth: MonthlyStats[];
+  daily: DailyStats[];
+}
+
+export interface DateFilter {
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface QueryParams extends DateFilter {
+  category?: string;
+}
+
+// Database strategy interface
+export interface DatabaseStrategy {
+  // Analytics queries (OLAP) - can use either Prisma or ClickHouse
+  getTotalStats(filter: DateFilter): Promise<StatsTotal>;
+  getCategoryStats(filter: DateFilter): Promise<CategoryStats[]>;
+  getMonthlyStats(filter: DateFilter): Promise<MonthlyStats[]>;
+  getDailyStats(filter: DateFilter): Promise<DailyStats[]>;
+  getAllExpenses(filter: QueryParams): Promise<Expense[]>;
+
+  // Transactional operations (OLTP) - should always use Prisma/PostgreSQL
+  createExpense(expense: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense>;
+}
+</file>
+
+<file type="new" name="lib/strategy/prisma.ts">
+import { PrismaClient } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+import {
+  DatabaseStrategy,
+  DateFilter,
+  QueryParams,
+  StatsTotal,
+  CategoryStats,
+  MonthlyStats,
+  DailyStats,
+  Expense,
+  prismaToExpense
+} from '../types';
+
+// Prisma raw query result types for monthly aggregation
+interface PrismaMonthlyResult {
+  month: Date;
+  count: bigint;
+  total: number;
+}
+
+export class PrismaStrategy implements DatabaseStrategy {
+  constructor(private prisma: PrismaClient) {}
+
+  private buildPrismaWhere(filter: DateFilter): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
+
+    if (filter.startDate || filter.endDate) {
+      where.date = {};
+
+      if (filter.startDate) {
+        (where.date as Record<string, unknown>).gte = new Date(filter.startDate);
+      }
+
+      if (filter.endDate) {
+        (where.date as Record<string, unknown>).lte = new Date(filter.endDate);
+      }
+    }
+
+    return where;
+  }
+
+  async getTotalStats(filter: DateFilter): Promise<StatsTotal> {
+    const where = this.buildPrismaWhere(filter);
+
+    const result = await this.prisma.expense.aggregate({
+      where,
+      _count: { id: true },
+      _sum: { amount: true }
+    });
+
+    return {
+      count: result._count.id,
+      amount: result._sum.amount ? Number(result._sum.amount) : 0
+    };
+  }
+
+  async getCategoryStats(filter: DateFilter): Promise<CategoryStats[]> {
+    const where = this.buildPrismaWhere(filter);
+
+    const result = await this.prisma.expense.groupBy({
+      by: ['category'],
+      where,
+      _count: { id: true },
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: 'desc' } }
+    });
+
+    return result.map(stat => ({
+      category: stat.category || 'Uncategorized',
+      count: stat._count.id,
+      total: stat._sum.amount ? Number(stat._sum.amount) : 0
+    }));
+  }
+
+  async getMonthlyStats(filter: DateFilter): Promise<MonthlyStats[]> {
+    // Use raw SQL for DATE_TRUNC function which Prisma doesn't support natively
+    let monthlyQuery = `
+      SELECT
+        DATE_TRUNC('month', date) as month,
+        COUNT(*) as count,
+        SUM(amount) as total
+      FROM expenses
+      WHERE 1=1
+    `;
+    const queryParams: string[] = [];
+
+    if (filter.startDate) {
+      queryParams.push(filter.startDate);
+      monthlyQuery += ` AND date >= $${queryParams.length}`;
+    }
+
+    if (filter.endDate) {
+      queryParams.push(filter.endDate);
+      monthlyQuery += ` AND date <= $${queryParams.length}`;
+    }
+
+    monthlyQuery += `
+      GROUP BY DATE_TRUNC('month', date)
+      ORDER BY month DESC
+    `;
+
+    const result = await this.prisma.$queryRawUnsafe<PrismaMonthlyResult[]>(monthlyQuery, ...queryParams);
+
+    return result.map(stat => ({
+      month: stat.month,
+      count: Number(stat.count),
+      total: Number(stat.total)
+    }));
+  }
+
+  async getDailyStats(filter: DateFilter): Promise<DailyStats[]> {
+    const where = this.buildPrismaWhere(filter);
+
+    const result = await this.prisma.expense.groupBy({
+      by: ['date'],
+      where,
+      _count: { id: true },
+      _sum: { amount: true },
+      orderBy: { date: 'desc' },
+      take: 30
+    });
+
+    return result.map(stat => ({
+      date: stat.date,
+      count: stat._count.id,
+      total: stat._sum.amount ? Number(stat._sum.amount) : 0
+    }));
+  }
+
+  async getAllExpenses(filter: QueryParams): Promise<Expense[]> {
+    const where: Record<string, unknown> = {};
+
+    if (filter.startDate || filter.endDate) {
+      where.date = {};
+
+      if (filter.startDate) {
+        (where.date as Record<string, unknown>).gte = new Date(filter.startDate);
+      }
+
+      if (filter.endDate) {
+        (where.date as Record<string, unknown>).lte = new Date(filter.endDate);
+      }
+    }
+
+    if (filter.category) {
+      where.category = filter.category;
+    }
+
+    const expenses = await this.prisma.expense.findMany({
+      where,
+      orderBy: [
+        { date: 'desc' },
+        { createdAt: 'desc' }
+      ]
+    });
+
+    return expenses.map(prismaToExpense);
+  }
+
+  async createExpense(expense: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense> {
+    const result = await this.prisma.expense.create({
+      data: {
+        description: expense.description,
+        amount: new Decimal(expense.amount),
+        category: expense.category || null,
+        date: expense.date
+      }
+    });
+
+    return prismaToExpense(result);
+  }
+}
+</file>
+
+<file type="new" name="lib/strategy/clickhouse.ts">
+import { executeClickHouseQuery } from '../clickhouse';
+import {
+  DatabaseStrategy,
+  DateFilter,
+  QueryParams,
+  StatsTotal,
+  CategoryStats,
+  MonthlyStats,
+  DailyStats,
+  Expense
+} from '../types';
+
+// ClickHouse result interfaces to ensure type safety
+interface ClickHouseTotalResult {
+  count: number;
+  total: number;
+}
+
+interface ClickHouseCategoryResult {
+  category: string;
+  count: number;
+  total: number;
+}
+
+interface ClickHouseMonthlyResult {
+  month: string;
+  count: number;
+  total: number;
+}
+
+interface ClickHouseDailyResult {
+  date: string;
+  count: number;
+  total: number;
+}
+
+interface ClickHouseExpenseResult {
+  id: number;
+  description: string;
+  amount: number;
+  category: string | null;
+  date: string;
+}
+
+export class ClickHouseStrategy implements DatabaseStrategy {
+  private buildWhereClause(filter: DateFilter): { whereClause: string; params: Record<string, string> } {
+    let whereClause = 'WHERE 1=1';
+    const params: Record<string, string> = {};
+
+    if (filter.startDate) {
+      whereClause += ` AND date >= {start_date:String}`;
+      params.start_date = filter.startDate;
+    }
+
+    if (filter.endDate) {
+      whereClause += ` AND date <= {end_date:String}`;
+      params.end_date = filter.endDate;
+    }
+
+    return { whereClause, params };
+  }
+
+  async getTotalStats(filter: DateFilter): Promise<StatsTotal> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const query = `SELECT COUNT(*) as count, sum(amount) as total FROM expenses ${whereClause}`;
+    const result = await executeClickHouseQuery<ClickHouseTotalResult>(query, params);
+
+    if (result.length === 0) {
+      return { count: 0, amount: 0 };
+    }
+
+    return {
+      count: result[0].count,
+      amount: result[0].total || 0
+    };
+  }
+
+  async getCategoryStats(filter: DateFilter): Promise<CategoryStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const query = `SELECT
+        if(empty(category), 'Uncategorized', category) as category,
+        COUNT(*) as count,
+        SUM(amount) as total
+       FROM expenses ${whereClause}
+       GROUP BY category
+       ORDER BY total DESC`;
+
+    const result = await executeClickHouseQuery<ClickHouseCategoryResult>(query, params);
+
+    return result.map(row => ({
+      category: row.category || 'Uncategorized',
+      count: row.count,
+      total: row.total
+    }));
+  }
+
+  async getMonthlyStats(filter: DateFilter): Promise<MonthlyStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    // Use toStartOfMonth function for ClickHouse DATE columns
+    const query = `SELECT
+        toStartOfMonth(date) as month,
+        COUNT(*) as count,
+        SUM(amount) as total
+       FROM expenses ${whereClause}
+       GROUP BY month
+       ORDER BY month DESC`;
+
+    const result = await executeClickHouseQuery<ClickHouseMonthlyResult>(query, params);
+
+    return result.map(row => ({
+      month: row.month, // Keep as string for ClickHouse
+      count: row.count,
+      total: row.total
+    }));
+  }
+
+  async getDailyStats(filter: DateFilter): Promise<DailyStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const query = `SELECT
+        date,
+        COUNT(*) as count,
+        SUM(amount) as total
+       FROM expenses ${whereClause}
+       GROUP BY date
+       ORDER BY date DESC
+       LIMIT 30`;
+
+    const result = await executeClickHouseQuery<ClickHouseDailyResult>(query, params);
+
+    return result.map(row => ({
+      date: new Date(row.date),
+      count: row.count,
+      total: row.total
+    }));
+  }
+
+  async getAllExpenses(filter: QueryParams): Promise<Expense[]> {
+    let whereClause = 'WHERE 1=1';
+    const params: Record<string, string> = {};
+
+    if (filter.startDate) {
+      whereClause += ` AND date >= {start_date:String}`;
+      params.start_date = filter.startDate;
+    }
+
+    if (filter.endDate) {
+      whereClause += ` AND date <= {end_date:String}`;
+      params.end_date = filter.endDate;
+    }
+
+    if (filter.category) {
+      whereClause += ` AND category = {category:String}`;
+      params.category = filter.category;
+    }
+
+    const query = `SELECT id, description, amount, category, date FROM expenses ${whereClause} ORDER BY date DESC, id DESC`;
+    const result = await executeClickHouseQuery<ClickHouseExpenseResult>(query, params);
+
+    return result.map(row => ({
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: new Date(row.date)
+    }));
+  }
+
+  async createExpense(expense: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense> {
+    // ClickHouse is not suitable for transactional OLTP operations like INSERT
+    // All write operations should always use Prisma/PostgreSQL
+    throw new Error('ClickHouse strategy should not be used for INSERT operations. Use PostgreSQL/Prisma for OLTP operations.');
+  }
+}
+</file>

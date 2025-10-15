@@ -1,0 +1,733 @@
+<EVALUATION type="expert">
+  <score>5/5</score>
+
+	<comment>
+		This is a very good port.
+		The agent created a clean and backward compatible abstraction.
+		It did minimal changes and used strong types.
+		This can be used as a high level inspiration for the codebase you are about to migrate
+	</comment>
+</EVALUATION>
+
+<file type="diff" modified="true">
+	diff --git a/test/pg-expense-direct/app/api/expenses/route.ts b/test/pg-expense-direct/app/api/expenses/route.ts
+	index 07f5040..e116c95 100644
+	--- a/test/pg-expense-direct/app/api/expenses/route.ts
+	+++ b/test/pg-expense-direct/app/api/expenses/route.ts
+	@@ -1,5 +1,6 @@
+	import { NextRequest, NextResponse } from 'next/server';
+	-import pool, { pgPool } from '@/lib/db';
+	+import { dbStrategy, pgPool } from '@/lib/db';
+	+import { QueryParams } from '@/lib/types';
+
+	export async function POST(request: NextRequest) {
+		try {
+	@@ -30,61 +31,32 @@ export async function POST(request: NextRequest) {
+	}
+
+	export async function GET(request: NextRequest) {
+	-  let query = '';
+	-  let params: any[] = [];
+	-
+	+  const { searchParams } = new URL(request.url);
+	+  const startDate = searchParams.get('startDate');
+	+  const endDate = searchParams.get('endDate');
+	+  const category = searchParams.get('category');
+	+
+	+  const filter: QueryParams = {
+	+    startDate: startDate || undefined,
+	+    endDate: endDate || undefined,
+	+    category: category || undefined
+	+  };
+	+
+		try {
+	-    const { searchParams } = new URL(request.url);
+	-    const startDate = searchParams.get('startDate');
+	-    const endDate = searchParams.get('endDate');
+	-    const category = searchParams.get('category');
+	-
+	-    query = 'SELECT * FROM expenses WHERE 1=1';
+	-    params = [];
+	-    let paramCount = 0;
+	-
+	-    if (startDate) {
+	-      paramCount++;
+	-      query += ` AND date >= $${paramCount}`;
+	-      params.push(startDate);
+	-    }
+	-
+	-    if (endDate) {
+	-      paramCount++;
+	-      query += ` AND date <= $${paramCount}`;
+	-      params.push(endDate);
+	-    }
+	-
+	-    if (category) {
+	-      paramCount++;
+	-      query += ` AND category = $${paramCount}`;
+	-      params.push(category);
+	-    }
+	-
+	-    // Conditional ordering based on database type
+	-    const useClickHouse = process.env.USE_CLICKHOUSE === 'true';
+	-    if (useClickHouse) {
+	-      // CONVERTED TO CLICKHOUSE: 2024-12-19
+	-      // ClickHouse requires ORDER BY for optimal performance with MergeTree tables
+	-      query += ' ORDER BY date DESC, id DESC';
+	-    } else {
+	-      query += ' ORDER BY date DESC, created_at DESC';
+	-    }
+	-
+	-    const result = await pool.query(query, params);
+	-    return NextResponse.json(result.rows);
+	+    // Use strategy pattern for querying expenses
+	+    const expenses = await dbStrategy.getAllExpenses(filter);
+	+    return NextResponse.json(expenses);
+		} catch (error) {
+			console.error('Error fetching expenses:', error);
+	-
+	+
+			// Enhanced error reporting for ClickHouse issues
+			if (process.env.USE_CLICKHOUSE === 'true') {
+				console.error('ClickHouse query error details:', {
+	-        query,
+	-        params,
+	+        filter,
+					error: error instanceof Error ? error.message : 'Unknown error'
+				});
+			}
+	-
+	+
+			return NextResponse.json(
+				{ error: 'Internal server error' },
+				{ status: 500 }
+	(END)
+</file>
+
+<file type="diff" modified="true">
+	diff --git a/test/pg-expense-direct/app/api/expenses/stats/route.ts b/test/pg-expense-direct/app/api/expenses/stats/route.ts
+	index 21bc65b..a500412 100644
+	--- a/test/pg-expense-direct/app/api/expenses/stats/route.ts
+	+++ b/test/pg-expense-direct/app/api/expenses/stats/route.ts
+	@@ -1,5 +1,6 @@
+	import { NextRequest, NextResponse } from 'next/server';
+	-import pool from '@/lib/db';
+	+import { dbStrategy } from '@/lib/db';
+	+import { DateFilter, ExpenseStats } from '@/lib/types';
+
+	export async function GET(request: NextRequest) {
+		try {
+	@@ -7,85 +8,24 @@ export async function GET(request: NextRequest) {
+			const startDate = searchParams.get('startDate');
+			const endDate = searchParams.get('endDate');
+
+	-    let whereClause = 'WHERE 1=1';
+	-    const params: any[] = [];
+	-    let paramCount = 0;
+	+    const filter: DateFilter = {
+	+      startDate: startDate || undefined,
+	+      endDate: endDate || undefined
+	+    };
+
+	-    if (startDate) {
+	-      paramCount++;
+	-      whereClause += ` AND date >= $${paramCount}`;
+	-      params.push(startDate);
+	-    }
+	+    // Use strategy pattern to get all stats
+	+    const [totalStats, categoryStats, monthlyStats, dailyStats] = await Promise.all([
+	+      dbStrategy.getTotalStats(filter),
+	+      dbStrategy.getCategoryStats(filter),
+	+      dbStrategy.getMonthlyStats(filter),
+	+      dbStrategy.getDailyStats(filter)
+	+    ]);
+
+	-    if (endDate) {
+	-      paramCount++;
+	-      whereClause += ` AND date <= $${paramCount}`;
+	-      params.push(endDate);
+	-    }
+	-
+	-    // Total expenses
+	-    const totalResult = await pool.query(
+	-      `SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM expenses ${whereClause}`,
+	-      params
+	-    );
+	-
+	-    // Expenses by category
+	-    const categoryResult = await pool.query(
+	-      `SELECT
+	-        COALESCE(category, 'Uncategorized') as category,
+	-        COUNT(*) as count,
+	-        SUM(amount) as total
+	-       FROM expenses ${whereClause}
+	-       GROUP BY category
+	-       ORDER BY total DESC`,
+	-      params
+	-    );
+	-
+	-    // Monthly aggregation
+	-    const monthlyResult = await pool.query(
+	-      `SELECT
+	-        DATE_TRUNC('month', date) as month,
+	-        COUNT(*) as count,
+	-        SUM(amount) as total
+	-       FROM expenses ${whereClause}
+	-       GROUP BY DATE_TRUNC('month', date)
+	-       ORDER BY month DESC`,
+	-      params
+	-    );
+	-
+	-    // Daily aggregation for last 30 days (or filtered range)
+	-    const dailyResult = await pool.query(
+	-      `SELECT
+	-        date,
+	-        COUNT(*) as count,
+	-        SUM(amount) as total
+	-       FROM expenses ${whereClause}
+	-       GROUP BY date
+	-       ORDER BY date DESC
+	-       LIMIT 30`,
+	-      params
+	-    );
+	-
+	-    const stats = {
+	-      total: {
+	-        count: parseInt(totalResult.rows[0].count),
+	-        amount: parseFloat(totalResult.rows[0].total)
+	-      },
+	-      byCategory: categoryResult.rows.map(row => ({
+	-        category: row.category,
+	-        count: parseInt(row.count),
+	-        total: parseFloat(row.total)
+	-      })),
+	-      byMonth: monthlyResult.rows.map(row => ({
+	-        month: row.month,
+	-        count: parseInt(row.count),
+	-        total: parseFloat(row.total)
+	-      })),
+	-      daily: dailyResult.rows.map(row => ({
+	-        date: row.date,
+	-        count: parseInt(row.count),
+	-        total: parseFloat(row.total)
+	-      }))
+	+    const stats: ExpenseStats = {
+	+      total: totalStats,
+	+      byCategory: categoryStats,
+	+      byMonth: monthlyStats,
+	+      daily: dailyStats
+			};
+
+			return NextResponse.json(stats);
+	(END)
+</file>
+
+<file type="diff" modified="true">
+	diff --git a/test/pg-expense-direct/lib/db.ts b/test/pg-expense-direct/lib/db.ts
+	index 607132e..0c82e05 100644
+	--- a/test/pg-expense-direct/lib/db.ts
+	+++ b/test/pg-expense-direct/lib/db.ts
+	@@ -1,6 +1,10 @@
+	import { Pool } from 'pg';
+	+import { DatabaseStrategy } from './types';
+	+import { PostgreSQLStrategy } from './strategies/postgresql';
+	+import { ClickHouseStrategy } from './strategies/clickhouse';
+
+	-const pool = new Pool({
+	+// PostgreSQL connection pool
+	+const pgPool = new Pool({
+		user: process.env.DB_USER || 'postgres',
+		host: process.env.DB_HOST || 'localhost',
+		database: process.env.DB_NAME || 'expense_db',
+	@@ -8,4 +12,24 @@ const pool = new Pool({
+		port: parseInt(process.env.DB_PORT || '5432'),
+	});
+
+	-export default pool;
+	\ No newline at end of file
+	+// Strategy pattern for database operations
+	+function createDatabaseStrategy(): DatabaseStrategy {
+	+  const useClickHouse = process.env.USE_CLICKHOUSE === 'true';
+	+
+	+  if (useClickHouse) {
+	+    console.log('🚀 Using ClickHouse strategy for OLAP queries');
+	+    return new ClickHouseStrategy();
+	+  } else {
+	+    console.log('🐘 Using PostgreSQL strategy for all queries');
+	+    return new PostgreSQLStrategy(pgPool);
+	+  }
+	+}
+	+
+	+// Export the strategy instance
+	+export const dbStrategy = createDatabaseStrategy();
+	+
+	+// Export PostgreSQL pool for OLTP operations (always use PostgreSQL for writes)
+	+export { pgPool };
+	+
+	+// Export default for backwards compatibility
+	+export default pgPool;
+	\ No newline at end of file
+</file>
+
+<file type="new" name="lib/clickhouse.ts">
+import { createClient, ClickHouseClient } from '@clickhouse/client';
+
+let clickhouseClient: ClickHouseClient | null = null;
+
+export function getClickHouseClient(): ClickHouseClient {
+  if (!clickhouseClient) {
+    clickhouseClient = createClient({
+      url: `https://${process.env.CLICKHOUSE_HOST}` || 'http://localhost:8123',
+      username: process.env.CLICKHOUSE_USER || 'default',
+      password: process.env.CLICKHOUSE_PASSWORD || '',
+      database: process.env.CLICKHOUSE_DATABASE || 'default',
+    });
+  }
+  return clickhouseClient;
+}
+
+// Helper function to execute ClickHouse queries with proper error handling
+export async function executeClickHouseQuery<T = Record<string, unknown>>(
+  query: string,
+  params: Record<string, unknown> = {}
+): Promise<T[]> {
+  const client = getClickHouseClient();
+
+  try {
+    const result = await client.query({
+      query,
+      query_params: params,
+      format: 'JSONEachRow'
+    });
+
+    const data = await result.json() as unknown;
+    return Array.isArray(data) ? (data as T[]) : [];
+  } catch (error) {
+    console.error('ClickHouse query error:', {
+      query,
+      params,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+}
+</file>
+
+<file type="new" name="lib/clickhouse.ts">
+// Type definitions for expense application
+
+export interface Expense {
+  id: number;
+  description: string;
+  amount: number;
+  category: string | null;
+  date: string; // ISO date string
+  created_at?: string; // ISO datetime string - PostgreSQL only
+}
+
+export interface StatsTotal {
+  count: number;
+  amount: number;
+}
+
+export interface CategoryStats {
+  category: string;
+  count: number;
+  total: number;
+}
+
+export interface MonthlyStats {
+  month: string | Date; // Date for PostgreSQL, string for ClickHouse
+  count: number;
+  total: number;
+}
+
+export interface DailyStats {
+  date: string; // ISO date string
+  count: number;
+  total: number;
+}
+
+export interface ExpenseStats {
+  total: StatsTotal;
+  byCategory: CategoryStats[];
+  byMonth: MonthlyStats[];
+  daily: DailyStats[];
+}
+
+export interface DateFilter {
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface QueryParams extends DateFilter {
+  category?: string;
+}
+
+// Database strategy interface
+export interface DatabaseStrategy {
+  getTotalStats(filter: DateFilter): Promise<StatsTotal>;
+  getCategoryStats(filter: DateFilter): Promise<CategoryStats[]>;
+  getMonthlyStats(filter: DateFilter): Promise<MonthlyStats[]>;
+  getDailyStats(filter: DateFilter): Promise<DailyStats[]>;
+  getAllExpenses(filter: QueryParams): Promise<Expense[]>;
+  createExpense(expense: Omit<Expense, 'id' | 'created_at'>): Promise<Expense>;
+}
+</file>
+
+
+
+<file type="new" name="lib/strategies/clickhouse.ts">
+import { executeClickHouseQuery } from '../clickhouse';
+import {
+  DatabaseStrategy,
+  DateFilter,
+  QueryParams,
+  StatsTotal,
+  CategoryStats,
+  MonthlyStats,
+  DailyStats,
+  Expense
+} from '../types';
+
+interface ClickHouseTotalResult {
+  count: number;
+  total: number;
+}
+
+interface ClickHouseCategoryResult {
+  category: string;
+  count: number;
+  total: number;
+}
+
+interface ClickHouseMonthlyResult {
+  month: string;
+  count: number;
+  total: number;
+}
+
+interface ClickHouseDailyResult {
+  date: string;
+  count: number;
+  total: number;
+}
+
+interface ClickHouseExpenseResult {
+  id: number;
+  description: string;
+  amount: number;
+  category: string | null;
+  date: string;
+}
+
+export class ClickHouseStrategy implements DatabaseStrategy {
+  constructor() {}
+
+  private buildWhereClause(filter: DateFilter): { whereClause: string; params: Record<string, string> } {
+    let whereClause = 'WHERE 1=1';
+    const params: Record<string, string> = {};
+
+    if (filter.startDate) {
+      whereClause += ` AND date >= {start_date:String}`;
+      params.start_date = filter.startDate;
+    }
+
+    if (filter.endDate) {
+      whereClause += ` AND date <= {end_date:String}`;
+      params.end_date = filter.endDate;
+    }
+
+    return { whereClause, params };
+  }
+
+  async getTotalStats(filter: DateFilter): Promise<StatsTotal> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const query = `SELECT COUNT(*) as count, sum(amount) as total FROM expenses ${whereClause}`;
+    const result = await executeClickHouseQuery<ClickHouseTotalResult>(query, params);
+
+    if (result.length === 0) {
+      return { count: 0, amount: 0 };
+    }
+
+    return {
+      count: result[0].count,
+      amount: result[0].total || 0
+    };
+  }
+
+  async getCategoryStats(filter: DateFilter): Promise<CategoryStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const query = `SELECT
+        if(empty(category), 'Uncategorized', category) as category,
+        COUNT(*) as count,
+        SUM(amount) as total
+       FROM expenses ${whereClause}
+       GROUP BY category
+       ORDER BY total DESC`;
+
+    const result = await executeClickHouseQuery<ClickHouseCategoryResult>(query, params);
+
+    return result.map(row => ({
+      category: row.category || 'Uncategorized',
+      count: row.count,
+      total: row.total
+    }));
+  }
+
+  async getMonthlyStats(filter: DateFilter): Promise<MonthlyStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    // Use toStartOfMonth directly on date column (assumes date is already Date32/Date type)
+    const query = `SELECT
+        toStartOfMonth(date) as month,
+        COUNT(*) as count,
+        SUM(amount) as total
+       FROM expenses ${whereClause}
+       GROUP BY month
+       ORDER BY month DESC`;
+
+    const result = await executeClickHouseQuery<ClickHouseMonthlyResult>(query, params);
+
+    return result.map(row => ({
+      month: row.month,
+      count: row.count,
+      total: row.total
+    }));
+  }
+
+  async getDailyStats(filter: DateFilter): Promise<DailyStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const query = `SELECT
+        date,
+        COUNT(*) as count,
+        SUM(amount) as total
+       FROM expenses ${whereClause}
+       GROUP BY date
+       ORDER BY date DESC
+       LIMIT 30`;
+
+    const result = await executeClickHouseQuery<ClickHouseDailyResult>(query, params);
+
+    return result.map(row => ({
+      date: row.date,
+      count: row.count,
+      total: row.total
+    }));
+  }
+
+  async getAllExpenses(filter: QueryParams): Promise<Expense[]> {
+    let whereClause = 'WHERE 1=1';
+    const params: Record<string, string> = {};
+
+    if (filter.startDate) {
+      whereClause += ` AND date >= {start_date:String}`;
+      params.start_date = filter.startDate;
+    }
+
+    if (filter.endDate) {
+      whereClause += ` AND date <= {end_date:String}`;
+      params.end_date = filter.endDate;
+    }
+
+    if (filter.category) {
+      whereClause += ` AND category = {category:String}`;
+      params.category = filter.category;
+    }
+
+    const query = `SELECT id, description, amount, category, date FROM expenses ${whereClause} ORDER BY date DESC, id DESC`;
+    const result = await executeClickHouseQuery<ClickHouseExpenseResult>(query, params);
+
+    return result.map(row => ({
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: row.date
+    }));
+  }
+
+  async createExpense(expense: Omit<Expense, 'id' | 'created_at'>): Promise<Expense> {
+    // ClickHouse is not suitable for transactional operations like INSERT
+    // This method should not be used - OLTP operations should always use PostgreSQL
+    throw new Error('ClickHouse strategy should not be used for INSERT operations. Use PostgreSQL for OLTP operations.');
+  }
+}
+</file>
+
+<file type="new" name="lib/strategies/postgres.ts">
+import { Pool } from 'pg';
+import {
+  DatabaseStrategy,
+  DateFilter,
+  QueryParams,
+  StatsTotal,
+  CategoryStats,
+  MonthlyStats,
+  DailyStats,
+  Expense
+} from '../types';
+
+export class PostgreSQLStrategy implements DatabaseStrategy {
+  constructor(private pool: Pool) {}
+
+  private buildWhereClause(filter: DateFilter): { whereClause: string; params: string[]; paramCount: number } {
+    let whereClause = 'WHERE 1=1';
+    const params: string[] = [];
+    let paramCount = 0;
+
+    if (filter.startDate) {
+      paramCount++;
+      whereClause += ` AND date >= $${paramCount}`;
+      params.push(filter.startDate);
+    }
+
+    if (filter.endDate) {
+      paramCount++;
+      whereClause += ` AND date <= $${paramCount}`;
+      params.push(filter.endDate);
+    }
+
+    return { whereClause, params, paramCount };
+  }
+
+  async getTotalStats(filter: DateFilter): Promise<StatsTotal> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const result = await this.pool.query(
+      `SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM expenses ${whereClause}`,
+      params
+    );
+
+    return {
+      count: parseInt(result.rows[0].count, 10),
+      amount: parseFloat(result.rows[0].total)
+    };
+  }
+
+  async getCategoryStats(filter: DateFilter): Promise<CategoryStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const result = await this.pool.query(
+      `SELECT
+        COALESCE(category, 'Uncategorized') as category,
+        COUNT(*) as count,
+        SUM(amount) as total
+       FROM expenses ${whereClause}
+       GROUP BY category
+       ORDER BY total DESC`,
+      params
+    );
+
+    return result.rows.map(row => ({
+      category: row.category,
+      count: parseInt(row.count, 10),
+      total: parseFloat(row.total)
+    }));
+  }
+
+  async getMonthlyStats(filter: DateFilter): Promise<MonthlyStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const result = await this.pool.query(
+      `SELECT
+        DATE_TRUNC('month', date) as month,
+        COUNT(*) as count,
+        SUM(amount) as total
+       FROM expenses ${whereClause}
+       GROUP BY DATE_TRUNC('month', date)
+       ORDER BY month DESC`,
+      params
+    );
+
+    return result.rows.map(row => ({
+      month: row.month,
+      count: parseInt(row.count, 10),
+      total: parseFloat(row.total)
+    }));
+  }
+
+  async getDailyStats(filter: DateFilter): Promise<DailyStats[]> {
+    const { whereClause, params } = this.buildWhereClause(filter);
+
+    const result = await this.pool.query(
+      `SELECT
+        date,
+        COUNT(*) as count,
+        SUM(amount) as total
+       FROM expenses ${whereClause}
+       GROUP BY date
+       ORDER BY date DESC
+       LIMIT 30`,
+      params
+    );
+
+    return result.rows.map(row => ({
+      date: row.date,
+      count: parseInt(row.count, 10),
+      total: parseFloat(row.total)
+    }));
+  }
+
+  async getAllExpenses(filter: QueryParams): Promise<Expense[]> {
+    let whereClause = 'WHERE 1=1';
+    const params: string[] = [];
+    let paramCount = 0;
+
+    if (filter.startDate) {
+      paramCount++;
+      whereClause += ` AND date >= $${paramCount}`;
+      params.push(filter.startDate);
+    }
+
+    if (filter.endDate) {
+      paramCount++;
+      whereClause += ` AND date <= $${paramCount}`;
+      params.push(filter.endDate);
+    }
+
+    if (filter.category) {
+      paramCount++;
+      whereClause += ` AND category = $${paramCount}`;
+      params.push(filter.category);
+    }
+
+    const query = `SELECT * FROM expenses ${whereClause} ORDER BY date DESC, created_at DESC`;
+    const result = await this.pool.query(query, params);
+
+    return result.rows.map(row => ({
+      id: row.id,
+      description: row.description,
+      amount: parseFloat(row.amount),
+      category: row.category,
+      date: row.date,
+      created_at: row.created_at
+    }));
+  }
+
+  async createExpense(expense: Omit<Expense, 'id' | 'created_at'>): Promise<Expense> {
+    const result = await this.pool.query(
+      'INSERT INTO expenses (description, amount, category, date) VALUES ($1, $2, $3, $4) RETURNING *',
+      [
+        expense.description,
+        expense.amount,
+        expense.category || null,
+        expense.date || new Date().toISOString().split('T')[0]
+      ]
+    );
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      description: row.description,
+      amount: parseFloat(row.amount),
+      category: row.category,
+      date: row.date,
+      created_at: row.created_at
+    };
+  }
+}
+</file>
