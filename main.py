@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 @click.version_option(version="1.0.0", prog_name="clickhouse-build")
 @click.pass_context
 def main(ctx):
-    """Agentic Postgres to ClickHouse migration tool."""
+    """An agentic Postgres -> ClickHouse migration tool."""
     print_logo()
 
     # If no subcommand is provided, show help

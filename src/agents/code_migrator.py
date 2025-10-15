@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from langfuse import observe
 from strands import Agent, tool
 from strands.models import BedrockModel
 
@@ -13,7 +14,7 @@ from ..tools.common import (bash_run, call_human, glob, grep, load_example,
                             read, reset_confirmations, write)
 from ..tui import print_error, print_header, print_info, print_summary_panel
 from ..utils import check_aws_credentials, get_callback_handler
-from ..utils.langfuse import conditional_observe, get_langfuse_client
+from ..utils.langfuse import get_langfuse_client
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
 @tool
-@conditional_observe(name="agent_code_migrator")
+@observe(name="agent_code_migrator")
 def agent_code_migrator(repo_path: str) -> str:
     """
     Run the code migrator agent to help migrate application code.

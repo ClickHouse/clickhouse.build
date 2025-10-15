@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
+from langfuse import observe
 from pydantic import BaseModel, Field
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -15,7 +16,7 @@ from ..tools.common import glob, grep, read
 from ..tui import (print_code, print_error, print_header, print_info,
                    print_list, print_summary_panel, print_table)
 from ..utils import check_aws_credentials, get_callback_handler
-from ..utils.langfuse import conditional_observe, get_langfuse_client
+from ..utils.langfuse import get_langfuse_client
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ class QueryAnalysisResult(BaseModel):
 
 
 @tool
-@conditional_observe(name="agent_scanner")
+@observe(name="agent_scanner")
 def agent_scanner(repo_path: str) -> str:
     logger.info(f"scanner starting analysis of repository: {repo_path}")
 

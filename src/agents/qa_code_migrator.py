@@ -1,6 +1,7 @@
 import json
 import logging
 
+from langfuse import observe
 from strands import Agent, tool
 from strands.models import BedrockModel
 
@@ -13,6 +14,7 @@ model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
 @tool
+@observe(name="agent_qa_code_migrator")
 def qa_approve(file_path: str, code_content: str, purpose: str = "code review") -> str:
     """
     Validate code before writing to a file.
@@ -91,7 +93,6 @@ Validate and return JSON with approval decision and reason.
 
             return json.dumps(result_json)
         except json.JSONDecodeError:
-            # Not valid JSON, reject
             logger.error(
                 f"QA returned invalid JSON for {file_path}: {result_str[:200]}"
             )
