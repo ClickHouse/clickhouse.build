@@ -142,9 +142,6 @@ Return JSON with "assumptions" list and "config" object as specified in system p
 
         try:
             result_data = json.loads(result_str)
-            print("got data")
-
-            # Display execution time
             exec_summary = {
                 "Execution Time": f"{elapsed_time:.2f}s ({elapsed_time/60:.2f}m)",
                 "Status": "Success",
