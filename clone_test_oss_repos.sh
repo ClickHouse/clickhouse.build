@@ -1,7 +1,7 @@
 #!/bin/bash
 
-mkdir -p test/external
-cd test/external
+mkdir -p eval_repos/external
+cd eval_repos/external
 
 if [ ! -d "cal.com" ]; then
     echo "Cloning cal.com..."

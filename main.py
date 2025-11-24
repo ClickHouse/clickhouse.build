@@ -63,7 +63,7 @@ def main(ctx):
     "repo_path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True),
     required=False,
-    default="test/pg-expense-direct",
+    default="eval_repos/pg-expense-direct",
 )
 @click.option(
     "--skip-credentials-check",
@@ -74,7 +74,7 @@ def scanner(repo_path: str, skip_credentials_check: bool):
     """
     Run the scanner agent to analyze a repository and find PostgreSQL analytical queries.
 
-    REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
+    REPO_PATH: Path to the repository to analyze (default: eval_repos/pg-expense-direct)
     """
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
@@ -108,7 +108,7 @@ def scanner(repo_path: str, skip_credentials_check: bool):
     "repo_path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True),
     required=False,
-    default="test/pg-expense-direct",
+    default="eval_repos/pg-expense-direct",
 )
 @click.option(
     "--skip-credentials-check",
@@ -125,7 +125,7 @@ def code_migrator(repo_path: str, skip_credentials_check: bool, yes: bool):
     """
     Run the code migrator agent to help migrate application code.
 
-    REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
+    REPO_PATH: Path to the repository to analyze (default: eval_repos/pg-expense-direct)
     """
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
@@ -163,7 +163,7 @@ def code_migrator(repo_path: str, skip_credentials_check: bool, yes: bool):
     "repo_path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True),
     required=False,
-    default="test/pg-expense-direct",
+    default="eval_repos/pg-expense-direct",
 )
 @click.option(
     "--replication-mode",
@@ -180,7 +180,7 @@ def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check:
     """
     Run the data migrator agent to analyze the plan and generate ClickPipe configuration.
 
-    REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
+    REPO_PATH: Path to the repository to analyze (default: eval_repos/pg-expense-direct)
     """
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
@@ -214,7 +214,7 @@ def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check:
     "repo_path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True),
     required=False,
-    default="test/pg-expense-direct",
+    default="eval_repos/pg-expense-direct",
 )
 @click.option(
     "--replication-mode",
@@ -237,7 +237,7 @@ def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool,
     """
     Run the complete migration workflow: [cyan]scanner[/cyan] [magenta]->[/magenta] [cyan]data_migrator[/cyan] [magenta]->[/magenta] [cyan]code_migrator[/cyan].
 
-    REPO_PATH: Path to the repository to analyze (default: test/pg-expense-direct)
+    REPO_PATH: Path to the repository to analyze (default: eval_repos/pg-expense-direct)
     """
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")

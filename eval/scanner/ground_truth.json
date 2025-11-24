@@ -2,7 +2,7 @@
   "test_cases": [
     {
       "name": "pg-expense-direct",
-      "repo_path": "test/pg-expense-direct",
+      "repo_path": "eval_repos/pg-expense-direct",
       "expected": {
         "total_tables": 1,
         "total_queries": 4,
@@ -33,7 +33,7 @@
     },
     {
       "name": "pg-expense-drizzleorm",
-      "repo_path": "test/pg-expense-drizzleorm",
+      "repo_path": "eval_repos/pg-expense-drizzleorm",
       "expected": {
         "total_tables": 1,
         "total_queries": 4,
@@ -64,7 +64,7 @@
     },
     {
       "name": "pg-expense-prisma",
-      "repo_path": "test/pg-expense-prisma",
+      "repo_path": "eval_repos/pg-expense-prisma",
       "expected": {
         "total_tables": 1,
         "total_queries": 4,

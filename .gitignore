@@ -12,7 +12,7 @@
 .vscode/settings.json
 logs/
 
-test/external
+eval_repos/external
 eval_results.json
 
 ##############################################################################

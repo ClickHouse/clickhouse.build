@@ -6,22 +6,22 @@
     {
       "description": "Total expense count and sum aggregation with optional date filtering",
       "code": "await db.select({\n      count: count(),\n      total: sum(expenses.amount)\n    })\n    .from(expenses)\n    .where(whereCondition);",
-      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-drizzleorm/app/api/expenses/stats/route.ts:L25-30"
+      "location": "/Users/pjhampton/workspace/clickhouse.build/eval_repos/pg-expense-drizzleorm/app/api/expenses/stats/route.ts:L25-30"
     },
     {
       "description": "Expenses aggregated by category with count and total sum, ordered by total amount descending",
       "code": "await db.select({\n      category: sql<string>`COALESCE(${expenses.category}, 'Uncategorized')`,\n      count: count(),\n      total: sum(expenses.amount)\n    })\n    .from(expenses)\n    .where(whereCondition)\n    .groupBy(sql`COALESCE(${expenses.category}, 'Uncategorized')`)\n    .orderBy(desc(sum(expenses.amount)));",
-      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-drizzleorm/app/api/expenses/stats/route.ts:L33-41"
+      "location": "/Users/pjhampton/workspace/clickhouse.build/eval_repos/pg-expense-drizzleorm/app/api/expenses/stats/route.ts:L33-41"
     },
     {
       "description": "Monthly expense aggregation using DATE_TRUNC with count and total sum, ordered by month descending",
       "code": "await db.select({\n      month: sql<Date>`DATE_TRUNC('month', ${expenses.date})`,\n      count: count(),\n      total: sum(expenses.amount)\n    })\n    .from(expenses)\n    .where(whereCondition)\n    .groupBy(sql`DATE_TRUNC('month', ${expenses.date})`)\n    .orderBy(desc(sql`DATE_TRUNC('month', ${expenses.date})`));",
-      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-drizzleorm/app/api/expenses/stats/route.ts:L44-52"
+      "location": "/Users/pjhampton/workspace/clickhouse.build/eval_repos/pg-expense-drizzleorm/app/api/expenses/stats/route.ts:L44-52"
     },
     {
       "description": "Daily expense aggregation with count and total sum, limited to last 30 days and ordered by date descending",
       "code": "await db.select({\n      date: expenses.date,\n      count: count(),\n      total: sum(expenses.amount)\n    })\n    .from(expenses)\n    .where(whereCondition)\n    .groupBy(expenses.date)\n    .orderBy(desc(expenses.date))\n    .limit(30);",
-      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-drizzleorm/app/api/expenses/stats/route.ts:L55-64"
+      "location": "/Users/pjhampton/workspace/clickhouse.build/eval_repos/pg-expense-drizzleorm/app/api/expenses/stats/route.ts:L55-64"
     }
   ]
 }

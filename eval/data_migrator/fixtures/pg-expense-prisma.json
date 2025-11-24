@@ -6,22 +6,22 @@
     {
       "description": "Aggregate total count and sum of all expenses with optional date filtering",
       "code": "await prisma.expense.aggregate({\n  where,\n  _count: { id: true },\n  _sum: { amount: true }\n});",
-      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-prisma/app/api/expenses/stats/route.ts:L21-25"
+      "location": "/Users/pjhampton/workspace/clickhouse.build/eval_repos/pg-expense-prisma/app/api/expenses/stats/route.ts:L21-25"
     },
     {
       "description": "Group expenses by category with count and sum aggregations, ordered by total amount descending",
       "code": "await prisma.expense.groupBy({\n  by: ['category'],\n  where,\n  _count: { id: true },\n  _sum: { amount: true },\n  orderBy: { _sum: { amount: 'desc' } }\n});",
-      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-prisma/app/api/expenses/stats/route.ts:L28-34"
+      "location": "/Users/pjhampton/workspace/clickhouse.build/eval_repos/pg-expense-prisma/app/api/expenses/stats/route.ts:L28-34"
     },
     {
       "description": "Monthly aggregation using raw SQL with DATE_TRUNC function to group expenses by month with count and sum",
       "code": "SELECT\n  DATE_TRUNC('month', date) as month,\n  COUNT(*) as count,\n  SUM(amount) as total\nFROM expenses\nWHERE 1=1\n  [AND date >= $1]\n  [AND date <= $2]\nGROUP BY DATE_TRUNC('month', date)\nORDER BY month DESC",
-      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-prisma/app/api/expenses/stats/route.ts:L37-66"
+      "location": "/Users/pjhampton/workspace/clickhouse.build/eval_repos/pg-expense-prisma/app/api/expenses/stats/route.ts:L37-66"
     },
     {
       "description": "Group expenses by date with count and sum aggregations, ordered by date descending, limited to 30 records",
       "code": "await prisma.expense.groupBy({\n  by: ['date'],\n  where,\n  _count: { id: true },\n  _sum: { amount: true },\n  orderBy: { date: 'desc' },\n  take: 30\n});",
-      "location": "/Users/pjhampton/workspace/clickhouse.build/test/pg-expense-prisma/app/api/expenses/stats/route.ts:L69-76"
+      "location": "/Users/pjhampton/workspace/clickhouse.build/eval_repos/pg-expense-prisma/app/api/expenses/stats/route.ts:L69-76"
     }
   ]
 }
