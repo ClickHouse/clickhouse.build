@@ -219,38 +219,58 @@ def write(file_path: str, content: str) -> str:
             if original_content == content:
                 console.print("[dim]No changes detected - content is identical[/dim]")
                 console.print()
-                # Still ask for approval but make it clear nothing will change
+
+                # For unchanged files, we skip them by default
                 if should_skip_confirmation():
-                    approved = False  # For unchanged files, default to not continuing
+                    # Auto-approve mode: skip unchanged files silently
                     console.print(
-                        "[dim]Skipping unchanged file (user selected 'all')[/dim]"
+                        "[dim]Skipping unchanged file (auto-approve enabled)[/dim]"
                     )
-                else:
-                    response = Prompt.ask(
-                        "[bold cyan]File is unchanged. Continue anyway? (y/n/all)[/bold cyan]",
-                        choices=["y", "n", "all"],
-                        default="n",
-                    )
-
-                    if response == "all":
-                        set_skip_confirmations()
-                        approved = False  # For unchanged files, even 'all' means skip
-                        console.print(
-                            "[green]All future operations will be auto-approved[/green]"
-                        )
-                    else:
-                        approved = response == "y"
-
-                if not approved:
                     return json.dumps(
                         {
                             "file": str(path),
                             "success": True,
                             "unchanged": True,
-                            "message": "No changes needed",
+                            "message": "No changes needed - skipped",
                         },
                         indent=2,
                     )
+
+                # Ask user what to do with unchanged file
+                response = Prompt.ask(
+                    "[bold cyan]File is unchanged. Write anyway? (y/n/all)[/bold cyan]",
+                    choices=["y", "n", "all"],
+                    default="n",
+                )
+
+                if response == "all":
+                    # Enable auto-approve for future operations
+                    set_skip_confirmations()
+                    console.print(
+                        "[green]All future operations will be auto-approved[/green]"
+                    )
+                    # For this unchanged file, skip the write
+                    return json.dumps(
+                        {
+                            "file": str(path),
+                            "success": True,
+                            "unchanged": True,
+                            "message": "No changes needed - skipped",
+                        },
+                        indent=2,
+                    )
+                elif response == "n":
+                    # User chose not to write unchanged file
+                    return json.dumps(
+                        {
+                            "file": str(path),
+                            "success": True,
+                            "unchanged": True,
+                            "message": "No changes needed - skipped",
+                        },
+                        indent=2,
+                    )
+                # If response == "y", continue to write the unchanged file (fall through)
             else:
                 # Generate unified diff
                 diff = list(

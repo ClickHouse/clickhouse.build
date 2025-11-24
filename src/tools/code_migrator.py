@@ -67,10 +67,15 @@ def get_chat_approval(
 
     logger.info(f"get_chat_approval called for {file_path}")
     logger.info(f"Active chat screen: {_active_chat_screen is not None}")
-    logger.info(f"Yes to all enabled: {_yes_to_all_enabled}")
+
+    # Check if "yes to all" is enabled (with lock for thread safety)
+    with _approval_lock:
+        yes_to_all = _yes_to_all_enabled
+
+    logger.info(f"Yes to all enabled: {yes_to_all}")
 
     # If "yes to all" is enabled, automatically approve
-    if _yes_to_all_enabled:
+    if yes_to_all:
         logger.info(f"Auto-approving {file_path} due to 'yes to all' setting")
         try:
             # Still show the change in chat for transparency
@@ -275,20 +280,23 @@ def _create_simple_diff(old_content: str, new_content: str) -> str:
 def enable_yes_to_all():
     """Enable 'yes to all' mode - automatically approve all future requests."""
     global _yes_to_all_enabled
-    _yes_to_all_enabled = True
+    with _approval_lock:
+        _yes_to_all_enabled = True
     logger.info("Yes to all mode enabled")
 
 
 def disable_yes_to_all():
     """Disable 'yes to all' mode - return to normal approval process."""
     global _yes_to_all_enabled
-    _yes_to_all_enabled = False
+    with _approval_lock:
+        _yes_to_all_enabled = False
     logger.info("Yes to all mode disabled")
 
 
 def is_yes_to_all_enabled():
     """Check if 'yes to all' mode is currently enabled."""
-    return _yes_to_all_enabled
+    with _approval_lock:
+        return _yes_to_all_enabled
 
 
 def get_active_chat_screen():

@@ -1,4 +1,4 @@
-# ClickHouse Build
+# ClickHouse Build (ProtoType)
 
 Agentic PostgreSQL to ClickHouse migration tool.
 
@@ -63,9 +63,9 @@ Before running the migration:
 
 ### AGENTS.md Example
 
-Create an `AGENTS.md` file in your repository root to provide context about your application:
+Create an `AGENTS.md` file in your repository root to provide context about your application.
+For more information see: https://agents.md/
 
-```markdown
 # Agent Context
 
 ## Architecture
@@ -98,6 +98,7 @@ uv run main.py --help
 
 ### Quick Start: Full Migration
 
+
 Run the complete migration workflow (recommended for first-time users):
 
 ```bash
@@ -123,7 +124,7 @@ Output: `.chbuild/scanner/scan_TIMESTAMP.json` with discovered queries
 **Data Migrator Agent** - Generate ClickPipe configuration for data migration:
 
 ```bash
-uv run main.py data-migrator [REPO_PATH] [--replication-mode cdc|snapshot|hybrid]
+uv run main.py data-migrator [REPO_PATH] [--replication-mode cdc|snapshot|cdc_only]
 ```
 
 Output: curl command with ClickPipe JSON configuration
@@ -139,7 +140,7 @@ Output: Modified application files with ClickHouse integration
 **Migrate** - Run the complete migration workflow (scanner → data-migrator → code-migrator):
 
 ```bash
-uv run main.py migrate [REPO_PATH] [--replication-mode cdc|snapshot|hybrid]
+uv run main.py migrate [REPO_PATH] [--replication-mode cdc|snapshot|cdc_only]
 ```
 
 ### Options
@@ -147,109 +148,9 @@ uv run main.py migrate [REPO_PATH] [--replication-mode cdc|snapshot|hybrid]
 - `--skip-credentials-check` - Skip AWS credentials validation
 - `--yes` / `-y` - Skip all confirmation prompts and approve all changes automatically (useful for CI/CD)
 - `--replication-mode` - Set replication mode for data migration:
-  - `cdc` - Change Data Capture for real-time sync
-  - `snapshot` - One-time snapshot replication
-  - `hybrid` - Snapshot followed by CDC
-
-### Meta Commands
-
-**Eval** - Run evaluations for agents:
-
-```bash
-uv run main.py eval scanner
-uv run main.py eval data-migrator
-```
-
-Evaluations compare agent output against ground truth test cases.
-
-## How It Works
-
-### Architecture
-
-`clickhouse.build` uses a multi-agent architecture where specialized AI agents collaborate:
-
-1. **Scanner Agent** - Uses regex patterns and code analysis to discover analytical queries
-2. **Data Migrator Agent** - Generates ClickPipe configurations with proper table mappings
-3. **Code Migrator Agent** - Transforms application code using extended thinking (10,000 reasoning tokens)
-4. **QA Agent** - Validates code quality before writes
-
-All agents use Claude Sonnet 4.5 via AWS Bedrock and have access to tools:
-- `grep` - Content search with regex
-- `glob` - File pattern matching
-- `read` - File reading with line numbers
-- `write` - File writing with diff display and approval
-- `bash_run` - Command execution with approval
-- `call_human` - Request user input
-
-### Safety Features
-
-- **User approval required** for all file writes
-- **Diff display** before making changes
-- **Approval workflow** for bash commands
-- **QA validation** before code generation
-- **Git branch requirement** prevents accidental main branch changes
-
-## Supported ORMs
-
-- Prisma (TypeScript/JavaScript)
-- Drizzle ORM (TypeScript)
-- Raw SQL queries
-
-## Limitations
-
-This is an **experimental prototype** (v0.1.0). Please be aware:
-
-- **AI-generated code requires human review** - Always review migrations before deployment
-- **No automated testing** - Test your migrated code thoroughly
-- **PostgreSQL focus** - Only PostgreSQL to ClickHouse migrations supported
-- **Node.js primary target** - Best tested with Node.js applications
-- **Requires manual ClickPipe setup** - Data migration configuration must be applied manually
-- **No rollback mechanism** - Use Git to revert changes if needed
-
-## Example Workflow
-
-### Interactive Mode (Default)
-
-```bash
-# 1. Create a migration branch
-git checkout -b migrate-to-clickhouse
-
-# 2. Run the migration (interactive - prompts for approval)
-uv run main.py migrate ./my-app --replication-mode cdc
-
-# 3. Review changes
-git diff
-
-# 4. Test the application
-cd my-app
-npm test
-
-# 5. If satisfied, commit
-git add .
-git commit -m "Migrate analytical queries to ClickHouse"
-```
-
-### CI/CD Mode (Automated)
-
-```bash
-# Run migration with --yes flag to skip all prompts
-uv run main.py migrate ./my-app --replication-mode cdc --yes
-
-# This will automatically:
-# - Run all migration steps without confirmation
-# - Approve all file changes
-# - Approve all bash commands
-```
-
-## Observability
-
-Optional Langfuse integration provides:
-- Agent execution traces
-- Tool usage analytics
-- Performance metrics
-- Debugging information
-
-Configure via `.env` file.
+  - `cdc` - Change Data Capture with initial snapshot + real-time sync
+  - `snapshot` - One-time snapshot replication only
+  - `cdc_only` - CDC without initial snapshot
 
 ## Contributing
 

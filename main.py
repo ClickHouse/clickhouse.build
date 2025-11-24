@@ -157,7 +157,7 @@ def code_migrator(repo_path: str, skip_credentials_check: bool):
 )
 @click.option(
     "--replication-mode",
-    type=click.Choice(["cdc", "snapshot", "hybrid"], case_sensitive=False),
+    type=click.Choice(["cdc", "snapshot", "cdc_only"], case_sensitive=False),
     default="cdc",
     help="Replication mode for data migration",
 )
@@ -208,7 +208,7 @@ def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check:
 )
 @click.option(
     "--replication-mode",
-    type=click.Choice(["cdc", "snapshot", "hybrid"], case_sensitive=False),
+    type=click.Choice(["cdc", "snapshot", "cdc_only"], case_sensitive=False),
     default="cdc",
     help="Replication mode for data migration",
 )

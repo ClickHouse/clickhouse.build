@@ -66,7 +66,10 @@ def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> st
 
     Args:
         repo_path: Path to the repository
-        replication_mode: Replication mode override (cdc, snapshot, cdc_only)
+        replication_mode: Replication mode (cdc, snapshot, or cdc_only). Default is "cdc".
+            - cdc: Change Data Capture with initial snapshot + real-time sync
+            - snapshot: One-time snapshot replication only
+            - cdc_only: CDC without initial snapshot
 
     Returns:
         Result from the data migrator tool (ClickPipe configuration)

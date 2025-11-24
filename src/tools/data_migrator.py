@@ -8,6 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 class ReplicationMode(Enum):
+    """Replication modes for ClickPipe data migration.
+
+    CDC: Change Data Capture - includes initial snapshot followed by real-time sync
+    SNAPSHOT: One-time snapshot replication only
+    CDC_ONLY: CDC without initial snapshot
+    """
     CDC = "cdc"
     SNAPSHOT = "snapshot"
     CDC_ONLY = "cdc_only"
