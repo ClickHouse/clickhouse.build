@@ -315,6 +315,12 @@ def _get_user_approval(
     Returns:
         User response string ('y' or 'n' or 'all')
     """
+    # Check for auto-approve flag (--yes mode)
+    import os
+    if os.environ.get("CHBUILD_AUTO_APPROVE") == "true":
+        logger.info(f"Auto-approving change to {file_path} (--yes flag enabled)")
+        return "y"
+
     try:
         # Try to use Chat UI approval system first
         try:

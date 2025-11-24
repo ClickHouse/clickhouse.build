@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 @click.group(invoke_without_command=True)
-@click.version_option(version="1.0.0", prog_name="clickhouse-build")
+@click.version_option(version="1.0.0-prototype", prog_name="clickhouse-build")
 @click.pass_context
 def main(ctx):
     """An agentic Postgres -> ClickHouse migration tool."""
@@ -217,7 +217,13 @@ def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check:
     is_flag=True,
     help="Skip AWS credentials validation",
 )
-def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool):
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip all confirmation prompts and approve all changes automatically",
+)
+def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool, yes: bool):
     """
     Run the complete migration workflow: [cyan]scanner[/cyan] [magenta]->[/magenta] [cyan]data_migrator[/cyan] [magenta]->[/magenta] [cyan]code_migrator[/cyan].
 
@@ -239,15 +245,22 @@ def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool)
         )
         sys.exit(1)
 
+    # Set environment variable for auto-approval if --yes flag is set
+    if yes:
+        os.environ["CHBUILD_AUTO_APPROVE"] = "true"
+
     try:
         # Step 1: Run scanner
         click.secho("\n[1/3] Scanner agent", fg="cyan", bold=True)
-        response = click.prompt(
-            "Run scanner agent? (y/n)",
-            type=click.Choice(["y", "n"]),
-            default="y",
-            show_choices=False,
-        )
+        if yes:
+            response = "y"
+        else:
+            response = click.prompt(
+                "Run scanner agent? (y/n)",
+                type=click.Choice(["y", "n"]),
+                default="y",
+                show_choices=False,
+            )
         if response == "y":
             from src.agents.scanner import agent_scanner
 
@@ -262,12 +275,15 @@ def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool)
             fg="cyan",
             bold=True,
         )
-        response = click.prompt(
-            "Run data migrator agent? (y/n)",
-            type=click.Choice(["y", "n"]),
-            default="y",
-            show_choices=False,
-        )
+        if yes:
+            response = "y"
+        else:
+            response = click.prompt(
+                "Run data migrator agent? (y/n)",
+                type=click.Choice(["y", "n"]),
+                default="y",
+                show_choices=False,
+            )
         if response == "y":
             from src.agents.data_migrator import run_data_migrator_agent
 
@@ -278,12 +294,15 @@ def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool)
 
         # Step 3: Run code migrator
         click.secho("\n[3/3] Code migrator agent", fg="cyan", bold=True)
-        response = click.prompt(
-            "Run code migrator agent? (y/n)",
-            type=click.Choice(["y", "n"]),
-            default="y",
-            show_choices=False,
-        )
+        if yes:
+            response = "y"
+        else:
+            response = click.prompt(
+                "Run code migrator agent? (y/n)",
+                type=click.Choice(["y", "n"]),
+                default="y",
+                show_choices=False,
+            )
         if response == "y":
             from src.agents.code_migrator import agent_code_migrator
 

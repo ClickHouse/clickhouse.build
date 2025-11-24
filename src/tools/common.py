@@ -303,8 +303,12 @@ def write(file_path: str, content: str) -> str:
 
         console.print()
 
-        # Ask for approval (unless user selected "all" previously)
-        if should_skip_confirmation():
+        # Ask for approval (unless user selected "all" previously or --yes flag is set)
+        import os
+        if os.environ.get("CHBUILD_AUTO_APPROVE") == "true":
+            approved = True
+            console.print("[dim]Auto-approved (--yes flag enabled)[/dim]")
+        elif should_skip_confirmation():
             approved = True
             console.print("[dim]Auto-approved (user selected 'all')[/dim]")
         else:
@@ -414,8 +418,12 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
         console.print()
 
-        # Ask for approval (unless user selected "all" previously)
-        if should_skip_confirmation():
+        # Ask for approval (unless user selected "all" previously or --yes flag is set)
+        import os
+        if os.environ.get("CHBUILD_AUTO_APPROVE") == "true":
+            approved = True
+            console.print("[dim]Auto-approved (--yes flag enabled)[/dim]")
+        elif should_skip_confirmation():
             approved = True
             console.print("[dim]Auto-approved (user selected 'all')[/dim]")
         else:

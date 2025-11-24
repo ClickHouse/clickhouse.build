@@ -1,6 +1,6 @@
 [project]
 name = "clickhouse-build"
-version = "1.0.0"
+version = "0.1.0"
 description = "PostgreSQL to ClickHouse Migration Tool with AI-powered query conversion"
 readme = "README.md"
 requires-python = ">=3.13"

@@ -37,7 +37,7 @@ def check_aws_credentials():
                 "1. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables\n"
                 "2. Configure AWS CLI: aws configure\n"
                 "3. Use IAM roles if running on EC2\n"
-                "4. Create ~/.aws/credentials file",
+                "4. Create ~/.aws/credentials file\n",
             )
 
         sts = boto3.client("sts")
@@ -52,7 +52,7 @@ def check_aws_credentials():
             "1. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables\n"
             "2. Configure AWS CLI: aws configure\n"
             "3. Use IAM roles if running on EC2\n"
-            "4. Create ~/.aws/credentials file",
+            "4. Create ~/.aws/credentials file\n",
         )
     except Exception as e:
         return False, f"Error checking AWS credentials: {str(e)}"

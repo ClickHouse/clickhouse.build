@@ -21,5 +21,5 @@ def print_logo() -> None:
     # Clear screen and move cursor to top
     print("\033[2J\033[H", end="")
     print("\n\n\033[33m" + get_logo() + "\033[0m")
-    print("Version: 0.1.0")
-    print("\033[33m" + "-" * 14 + "\033[0m")
+    print("Version: 0.1.0-prototype")
+    print("\033[33m" + "-" * 24 + "\033[0m")
