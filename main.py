@@ -115,7 +115,13 @@ def scanner(repo_path: str, skip_credentials_check: bool):
     is_flag=True,
     help="Skip AWS credentials validation",
 )
-def code_migrator(repo_path: str, skip_credentials_check: bool):
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip all confirmation prompts and approve all changes automatically",
+)
+def code_migrator(repo_path: str, skip_credentials_check: bool, yes: bool):
     """
     Run the code migrator agent to help migrate application code.
 
@@ -136,6 +142,10 @@ def code_migrator(repo_path: str, skip_credentials_check: bool):
             f"Error: Repository path does not exist: {repo_path}", fg="red", err=True
         )
         sys.exit(1)
+
+    # Set environment variable for auto-approval if --yes flag is set
+    if yes:
+        os.environ["CHBUILD_AUTO_APPROVE"] = "true"
 
     try:
         from src.agents.code_migrator import agent_code_migrator

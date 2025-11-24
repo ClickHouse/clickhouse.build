@@ -156,10 +156,6 @@ uv run main.py migrate [REPO_PATH] [--replication-mode cdc|snapshot|cdc_only]
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
-## License
-
-[License TBD - Add before release]
-
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/ClickHouse/clickhouse.build/issues)
