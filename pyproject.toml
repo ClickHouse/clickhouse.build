@@ -5,8 +5,8 @@ description = "PostgreSQL to ClickHouse Migration Tool with AI-powered query con
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "strands-agents>=1.8.0",
-    "strands-agents-tools>=0.2.7",
+    "strands-agents>=1.18.0",
+    "strands-agents-tools>=0.2.16",
     "mcp",
     "notebook",
     "semver>=3.0.4",
