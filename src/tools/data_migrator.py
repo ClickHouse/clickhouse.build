@@ -78,6 +78,8 @@ If you have alternative networking requirements you can refer to this guide: htt
 
         # Format the JSON config with proper indentation for readability
         config_json = json.dumps(config, indent=2)
+        # Unquote the port number so it's a number type in JSON
+        config_json = config_json.replace('"${POSTGRES_PORT}"', '${POSTGRES_PORT}')
 
         curl_command = (
             "export ORGANIZATION_ID=<REPLACE_ME>\n"
@@ -87,10 +89,12 @@ If you have alternative networking requirements you can refer to this guide: htt
             "export POSTGRES_USER=<REPLACE_ME>\n"
             "export POSTGRES_PASSWORD=<REPLACE_ME>\n"
             "\n"
-            "curl -X POST https://api.clickhouse.cloud/v1/organizations/$ORGANIZATION_ID/services/$SERVICE_ID/clickpipes/ \\\n"
+            "envsubst <<'EOF' | curl -X POST \"https://api.clickhouse.cloud/v1/organizations/$ORGANIZATION_ID/services/$SERVICE_ID/clickpipes/\" \\\n"
             "  --header 'Authorization: Basic (...)' \\\n"
             "  --header 'Content-Type: application/json' \\\n"
-            f"  --data '{config_json}'"
+            "  --data @-\n"
+            f"{config_json}\n"
+            "EOF"
         )
 
         return json.dumps({"info": info_text, "command": curl_command})
