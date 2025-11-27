@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build distribution packages
+        run: uv build
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.whl
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## Installation
+
+            ### Using uv (recommended)
+            ```bash
+            uv pip install https://github.com/ClickHouse/clickhouse.build/releases/download/${{ github.ref_name }}/clickhouse_build-${{ steps.get_version.outputs.VERSION }}-py3-none-any.whl
+            ```
+
+            ### Using pip
+            ```bash
+            pip install https://github.com/ClickHouse/clickhouse.build/releases/download/${{ github.ref_name }}/clickhouse_build-${{ steps.get_version.outputs.VERSION }}-py3-none-any.whl
+            ```
+
+            ### From source
+            ```bash
+            pip install https://github.com/ClickHouse/clickhouse.build/archive/refs/tags/${{ github.ref_name }}.tar.gz
+            ```
+
+            ## What's Changed
+            See the full changelog below.
