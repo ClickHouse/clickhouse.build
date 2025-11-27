@@ -2,6 +2,8 @@ import glob as glob_module
 import json
 import logging
 import os
+import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -24,6 +26,50 @@ EXCLUDED_DIRS = {
 # Global state to track if user selected "all" for confirmations
 _skip_confirmations = False
 
+# Allowlist of safe command prefixes that can be executed
+# These are common development tools that are generally safe
+ALLOWED_COMMANDS = {
+    'npm',
+    'yarn',
+    'pnpm',
+    'node',
+    'python',
+    'python3',
+    'pip',
+    'pip3',
+    'git',
+    'ls',
+    'cat',
+    'grep',
+    'find',
+    'mkdir',
+    'touch',
+    'echo',
+    'pwd',
+    'which',
+    'whoami',
+    'env',
+    'printenv',
+    'test',
+    'tsc',
+    'npx',
+}
+
+# Patterns that indicate dangerous commands
+DANGEROUS_PATTERNS = [
+    r'\brm\s+-rf\s+/',           # Dangerous rm commands targeting root
+    r'\brm\s+-rf\s+\*',          # Dangerous rm commands with wildcards
+    r'\b(sudo|su)\b',            # Privilege escalation
+    r'[>;|]\s*/dev/',            # Device manipulation
+    r':\(\)\{.*\};',             # Fork bombs
+    r'curl.*\|.*(bash|sh)',      # Piping to shell from curl
+    r'wget.*\|.*(bash|sh)',      # Piping to shell from wget
+    r'\bchmod\s+777',            # Overly permissive chmod
+    r'\bchown\s+-R\s+.*\s+/',    # Dangerous recursive chown on root
+    r'>\s*/dev/sd[a-z]',         # Writing to disk devices
+    r'dd\s+if=.*of=/dev/',       # Dangerous dd operations
+]
+
 
 def reset_confirmations():
     """Reset the confirmation skip state."""
@@ -40,6 +86,132 @@ def set_skip_confirmations():
     """Set the flag to skip future confirmations."""
     global _skip_confirmations
     _skip_confirmations = True
+
+
+def _is_dangerous_command(command: str) -> tuple[bool, str | None]:
+    """
+    Check if a command matches dangerous patterns.
+
+    Args:
+        command: The command to check
+
+    Returns:
+        Tuple of (is_dangerous, reason)
+    """
+    for pattern in DANGEROUS_PATTERNS:
+        if re.search(pattern, command):
+            return True, f"Command matches dangerous pattern: {pattern}"
+    return False, None
+
+
+def _requires_shell_features(command: str) -> bool:
+    """
+    Check if a command requires shell features (pipes, redirects, etc).
+
+    Args:
+        command: The command to check
+
+    Returns:
+        True if shell features are required
+    """
+    shell_features = ['|', '>', '<', '&&', '||', ';', '$(', '`', '*', '?', '[', '{']
+    return any(feature in command for feature in shell_features)
+
+
+def _get_command_base(command: str) -> str | None:
+    """
+    Extract the base command (first word) from a command string.
+
+    Args:
+        command: The command to parse
+
+    Returns:
+        The base command or None if parsing fails
+    """
+    try:
+        # Try to parse with shlex to handle quotes properly
+        parts = shlex.split(command)
+        if parts:
+            return parts[0]
+    except ValueError:
+        # If shlex fails, fall back to simple split
+        pass
+
+    # Fallback: just get first word
+    parts = command.strip().split()
+    return parts[0] if parts else None
+
+
+def _is_command_allowed(command: str) -> tuple[bool, str | None]:
+    """
+    Check if a command is in the allowlist.
+
+    Args:
+        command: The command to check
+
+    Returns:
+        Tuple of (is_allowed, reason)
+    """
+    base_command = _get_command_base(command)
+
+    if not base_command:
+        return False, "Could not parse command"
+
+    # Check if base command is in allowlist
+    if base_command in ALLOWED_COMMANDS:
+        return True, None
+
+    # Check if it's a path to an allowed command (e.g., /usr/bin/npm)
+    base_name = os.path.basename(base_command)
+    if base_name in ALLOWED_COMMANDS:
+        return True, None
+
+    return False, f"Command '{base_command}' is not in the allowlist"
+
+
+def _execute_command_safely(
+    command: str, work_path: Path, timeout: int = 300
+) -> subprocess.CompletedProcess:
+    """
+    Execute a command with appropriate safety measures.
+
+    Args:
+        command: The command to execute
+        work_path: Working directory
+        timeout: Timeout in seconds
+
+    Returns:
+        subprocess.CompletedProcess result
+    """
+    # If command doesn't require shell features, use shell=False for safety
+    if not _requires_shell_features(command):
+        try:
+            # Parse command into array for safer execution
+            cmd_array = shlex.split(command)
+            logger.debug(f"Executing without shell: {cmd_array}")
+
+            return subprocess.run(
+                cmd_array,
+                shell=False,
+                cwd=str(work_path),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except (ValueError, FileNotFoundError) as e:
+            # If parsing fails, log and fall back to shell execution
+            logger.warning(f"Failed to execute without shell: {e}, falling back to shell=True")
+
+    # Fall back to shell execution (for pipes, redirects, etc.)
+    logger.debug(f"Executing with shell: {command}")
+    return subprocess.run(
+        command,
+        shell=True,
+        cwd=str(work_path),
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
 
 
 @tool
@@ -390,6 +562,12 @@ def bash_run(command: str, working_dir: str = ".") -> str:
     """
     Execute a bash command in the specified directory with user approval.
 
+    Security features:
+    - Validates commands against an allowlist of safe commands
+    - Detects and blocks dangerous command patterns
+    - Uses shell=False when possible to prevent command injection
+    - Requires user approval before execution
+
     Args:
         command: The bash command to execute
         working_dir: The directory to run the command in (defaults to current directory)
@@ -417,6 +595,39 @@ def bash_run(command: str, working_dir: str = ".") -> str:
                     "stdout": "",
                     "stderr": "",
                 }
+            )
+
+        # Security check 1: Check for dangerous command patterns
+        is_dangerous, danger_reason = _is_dangerous_command(command)
+        if is_dangerous:
+            logger.warning(f"Blocked dangerous command: {command} - {danger_reason}")
+            return json.dumps(
+                {
+                    "error": f"Dangerous command blocked: {danger_reason}",
+                    "command": command,
+                    "exit_code": 1,
+                    "stdout": "",
+                    "stderr": "",
+                    "blocked": True,
+                },
+                indent=2,
+            )
+
+        # Security check 2: Check if command is in allowlist
+        is_allowed, allow_reason = _is_command_allowed(command)
+        if not is_allowed:
+            logger.warning(f"Blocked non-allowlisted command: {command} - {allow_reason}")
+            return json.dumps(
+                {
+                    "error": f"Command not allowed: {allow_reason}",
+                    "command": command,
+                    "exit_code": 1,
+                    "stdout": "",
+                    "stderr": "",
+                    "blocked": True,
+                    "hint": f"Allowed commands: {', '.join(sorted(ALLOWED_COMMANDS))}",
+                },
+                indent=2,
             )
 
         # Force a newline to break out of any active callback displays
@@ -481,14 +692,8 @@ def bash_run(command: str, working_dir: str = ".") -> str:
         console.print(f"[dim]Running: {command}[/dim]")
         logger.info(f"Running command: {command} in {work_path}")
 
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=str(work_path),
-            capture_output=True,
-            text=True,
-            timeout=300,  # 5 minute timeout
-        )
+        # Execute command with safety measures
+        result = _execute_command_safely(command, work_path, timeout=300)
 
         # Show result
         if result.returncode == 0:
