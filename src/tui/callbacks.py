@@ -22,6 +22,7 @@ class PrintingCallbackHandler:
         "call_human": "CallHuman",
         "load_example": "LoadExample",
         "create_clickpipe": "CreateClickPipe",
+        "qa_approve": "QA",
     }
 
     def __init__(self) -> None:
@@ -115,11 +116,12 @@ class PrintingCallbackHandler:
                     self.current_tool_number = self.tool_count
 
                     # Check if this tool handles its own display - if so, we'll auto-complete immediately
-                    # Tools that show their own prompts: call_human, write, bash_run
+                    # Tools that show their own prompts: call_human, write, bash_run, qa_approve
                     handles_own_display = tool_name in [
                         "call_human",
                         "write",
                         "bash_run",
+                        "qa_approve",
                     ]
 
                     # Build formatted tool call text
