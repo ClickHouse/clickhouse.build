@@ -336,14 +336,16 @@ def migrate(
 @main.command()
 @click.argument(
     "agent",
-    type=click.Choice(["scanner", "data-migrator"], case_sensitive=False),
+    type=click.Choice(
+        ["scanner", "data-migrator", "qa-code-migrator"], case_sensitive=False
+    ),
     required=True,
 )
 def eval(agent: str):
     """
     Run evaluations for the specified agent.
 
-    AGENT: The agent to evaluate (scanner or data-migrator)
+    AGENT: The agent to evaluate (scanner, data-migrator, or qa-code-migrator)
     """
     click.secho(f"\nRunning {agent} evaluation...\n", fg="cyan", bold=True)
 
