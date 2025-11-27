@@ -2,6 +2,8 @@
 
 Agentic PostgreSQL to ClickHouse migration tool.
 
+<img src="./.github/static/chbuild.png" alt="clickhouse.build cli tool">
+
 ## What Does It Do?
 
 `clickhouse.build` automates the complex process of migrating from PostgreSQL to ClickHouse:
