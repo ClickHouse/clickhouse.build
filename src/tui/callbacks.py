@@ -74,7 +74,6 @@ class PrintingCallbackHandler:
         data = kwargs.get("data", "")
         complete = kwargs.get("complete", False)
         current_tool_use = kwargs.get("current_tool_use", {})
-        agent = kwargs.get("agent")
 
         # If we're getting text data and have an active tool, complete it first
         if data and self.current_live:

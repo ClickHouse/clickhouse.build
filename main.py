@@ -12,6 +12,16 @@ from pathlib import Path
 import rich_click as click
 from dotenv import load_dotenv
 
+# Load environment and configure path early
+load_dotenv()
+sys.path.insert(0, str(Path(__file__).parent))
+
+# Now import local modules (after sys.path modification)
+from src.logging_config import get_chbuild_logger  # noqa: E402
+from src.tui.logo import print_logo  # noqa: E402
+from src.utils import check_aws_credentials  # noqa: E402
+
+# Configure rich_click after imports
 click.rich_click.USE_RICH_MARKUP = True
 click.rich_click.SHOW_ARGUMENTS = True
 click.rich_click.GROUP_ARGUMENTS_OPTIONS = True
@@ -31,13 +41,6 @@ click.rich_click.COMMAND_GROUPS = {
         },
     ]
 }
-
-load_dotenv()
-sys.path.insert(0, str(Path(__file__).parent))
-
-from src.logging_config import get_chbuild_logger
-from src.tui.logo import print_logo
-from src.utils import check_aws_credentials
 
 _, log_file_path = get_chbuild_logger()
 logger = logging.getLogger(__name__)
@@ -229,7 +232,9 @@ def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check:
     is_flag=True,
     help="Skip all confirmation prompts and approve all changes automatically",
 )
-def migrate(repo_path: str, replication_mode: str, skip_credentials_check: bool, yes: bool):
+def migrate(
+    repo_path: str, replication_mode: str, skip_credentials_check: bool, yes: bool
+):
     """
     Run the complete migration workflow: [cyan]scanner[/cyan] [magenta]->[/magenta] [cyan]data_migrator[/cyan] [magenta]->[/magenta] [cyan]code_migrator[/cyan].
 

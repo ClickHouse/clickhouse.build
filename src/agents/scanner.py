@@ -13,8 +13,15 @@ from strands.models import BedrockModel
 from ..logging_config import get_current_log_file
 from ..prompts.scanner import get_system_prompt
 from ..tools.common import glob, grep, read
-from ..tui import (print_code, print_error, print_header, print_info,
-                   print_list, print_summary_panel, print_table)
+from ..tui import (
+    print_code,
+    print_error,
+    print_header,
+    print_info,
+    print_list,
+    print_summary_panel,
+    print_table,
+)
 from ..utils import check_aws_credentials, get_callback_handler
 from ..utils.langfuse import get_langfuse_client
 

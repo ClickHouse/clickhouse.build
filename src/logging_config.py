@@ -7,7 +7,6 @@ frontend (TUI) and backend components with consistent formatting and output.
 
 import logging
 import logging.handlers
-import os
 import sys
 from enum import Enum
 from pathlib import Path

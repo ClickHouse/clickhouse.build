@@ -201,7 +201,7 @@ def run_single_eval(
             print(f"  - {assumption}")
 
     if not metrics.all_correct:
-        print(f"\n⚠️  Issues found:")
+        print("\n⚠️  Issues found:")
         if not metrics.database_correct:
             try:
                 actual_config = extract_config_from_curl(actual["command"])
@@ -212,7 +212,7 @@ def run_single_eval(
             except:
                 pass
         if not metrics.table_mappings_correct:
-            print(f"   Table mappings do not match expected")
+            print("   Table mappings do not match expected")
 
     return result
 
@@ -286,7 +286,7 @@ def main():
             / len(valid_results),
         }
 
-        print(f"\nComponent Accuracy:")
+        print("\nComponent Accuracy:")
         print(f"  Database: {metrics_summary['database_accuracy']:.1%}")
         print(f"  Destination: {metrics_summary['destination_accuracy']:.1%}")
         print(f"  Replication Mode: {metrics_summary['replication_mode_accuracy']:.1%}")

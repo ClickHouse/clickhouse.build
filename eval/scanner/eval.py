@@ -326,7 +326,7 @@ def main():
             valid_results
         )
 
-        print(f"\nAverage Metrics:")
+        print("\nAverage Metrics:")
         print(f"  Precision: {avg_precision:.1%}")
         print(f"  Recall: {avg_recall:.1%}")
         print(f"  F1 Score: {avg_f1:.1%}")

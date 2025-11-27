@@ -93,7 +93,7 @@ def run_single_eval(test_case: Dict) -> Dict[str, Any]:
         pass
 
     if not metrics.approval_correct:
-        print(f"\n⚠️  Approval decision incorrect")
+        print("\n⚠️  Approval decision incorrect")
 
     return result_data
 

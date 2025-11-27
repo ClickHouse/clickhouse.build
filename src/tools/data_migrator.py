@@ -14,6 +14,7 @@ class ReplicationMode(Enum):
     SNAPSHOT: One-time snapshot replication only
     CDC_ONLY: CDC without initial snapshot
     """
+
     CDC = "cdc"
     SNAPSHOT = "snapshot"
     CDC_ONLY = "cdc_only"
@@ -79,7 +80,7 @@ If you have alternative networking requirements you can refer to this guide: htt
         # Format the JSON config with proper indentation for readability
         config_json = json.dumps(config, indent=2)
         # Unquote the port number so it's a number type in JSON
-        config_json = config_json.replace('"${POSTGRES_PORT}"', '${POSTGRES_PORT}')
+        config_json = config_json.replace('"${POSTGRES_PORT}"', "${POSTGRES_PORT}")
 
         curl_command = (
             "export ORGANIZATION_ID=<REPLACE_ME>\n"

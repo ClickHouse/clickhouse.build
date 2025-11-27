@@ -1,12 +1,13 @@
 # ClickHouse Build (ProtoType)
 
-Agentic PostgreSQL to ClickHouse migration tool.
+Agentic PostgreSQL to ClickHouse migration tool for TypeScript projects.
+This prototype was co-developed between AWS and ClickHouse.
 
 <img src="./.github/static/chbuild.png" alt="clickhouse.build cli tool">
 
 ## What Does It Do?
 
-`clickhouse.build` automates the complex process of migrating from PostgreSQL to ClickHouse:
+`clickhouse.build` assists with the  process of migrating from PostgreSQL to ClickHouse:
 
 1. **Scans** your codebase to discover PostgreSQL analytical queries (aggregations, GROUP BY, window functions, etc.)
 2. **Generates** ClickPipe configuration for CDC or snapshot-based data replication
@@ -46,9 +47,6 @@ Required environment variables:
 - `AWS_ACCESS_KEY_ID` - Your AWS access key
 - `AWS_SECRET_ACCESS_KEY` - Your AWS secret key
 - `AWS_DEFAULT_REGION` - AWS region (e.g., us-east-1)
-- `LANGFUSE_SECRET_KEY` - (Optional) For observability
-- `LANGFUSE_PUBLIC_KEY` - (Optional) For observability
-- `LANGFUSE_HOST` - (Optional) Langfuse host URL
 
 3. Install dependencies:
 
@@ -67,28 +65,6 @@ Before running the migration:
 
 Create an `AGENTS.md` file in your repository root to provide context about your application.
 For more information see: https://agents.md/
-
-# Agent Context
-
-## Architecture
-This is a Node.js expense tracking application using PostgreSQL.
-
-## Database
-- ORM: Prisma
-- Database: PostgreSQL 14
-- Key tables: users, expenses, categories, budgets
-
-## Analytical Queries
-We use PostgreSQL for both OLTP and OLAP workloads. The main analytical queries are:
-- Monthly expense aggregations by category
-- Budget tracking with rolling windows
-- User spending analytics
-
-## Migration Goals
-- Move analytical queries to ClickHouse for better performance
-- Keep transactional operations in PostgreSQL
-- Maintain backward compatibility during transition
-```
 
 ## Running
 
@@ -157,8 +133,4 @@ uv run main.py migrate [REPO_PATH] [--replication-mode cdc|snapshot|cdc_only]
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/ClickHouse/clickhouse.build/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/ClickHouse/clickhouse.build/discussions)
+We welcome feedback on the direction of this project as we continue to evolve it.

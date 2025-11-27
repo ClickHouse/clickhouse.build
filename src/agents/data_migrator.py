@@ -11,8 +11,7 @@ from strands.models import BedrockModel
 from ..logging_config import get_current_log_file
 from ..prompts.data_migrator import get_system_prompt
 from ..tools.data_migrator import create_clickpipe
-from ..tui import (print_code, print_error, print_header, print_info,
-                   print_summary_panel)
+from ..tui import print_code, print_error, print_header, print_info, print_summary_panel
 from ..utils import check_aws_credentials, get_callback_handler
 from ..utils.langfuse import get_langfuse_client
 from .scanner import agent_scanner

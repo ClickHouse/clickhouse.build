@@ -1,22 +1,16 @@
-import logging
-import os
-
-from strands import Agent, tool
-from strands_tools import file_write
-
-logger = logging.getLogger(__name__)
-
-
 """
 Integration module for chat UI approval system.
 Allows tools to request approval through the chat interface.
 """
 
 import logging
+import os
 import threading
 import time
-from pathlib import Path
 from typing import Any, Dict, Optional
+
+from strands import Agent, tool
+from strands_tools import file_write
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +84,7 @@ def get_chat_approval(
                 )
             except Exception:
                 pass  # Don't fail if we can't show the message
-        except:
+        except Exception:
             pass  # Don't fail if we can't show the message
         return True
 
@@ -159,10 +153,10 @@ def get_chat_approval(
                     f"{request_detailed_prompt}\n\n"
                     if request_detailed_prompt
                     else ""
-                    f"**Do you approve this change?**\n"
-                    f"• `y` or `yes` - Approve this change\n"
-                    f"• `n` or `no` - Reject this change\n"
-                    f"• `all` - Approve this and all future changes"
+                    "**Do you approve this change?**\n"
+                    "• `y` or `yes` - Approve this change\n"
+                    "• `n` or `no` - Reject this change\n"
+                    "• `all` - Approve this and all future changes"
                 )
             else:
                 # Simple approval request
@@ -172,10 +166,10 @@ def get_chat_approval(
                     f"{request_detailed_prompt}\n\n"
                     if request_detailed_prompt
                     else ""
-                    f"**Do you approve this change?**\n"
-                    f"• `y` or `yes` - Approve this change\n"
-                    f"• `n` or `no` - Reject this change\n"
-                    f"• `all` - Approve this and all future changes"
+                    "**Do you approve this change?**\n"
+                    "• `y` or `yes` - Approve this change\n"
+                    "• `n` or `no` - Reject this change\n"
+                    "• `all` - Approve this and all future changes"
                 )
 
             # Use thread-safe method to add the message
@@ -325,6 +319,7 @@ def _get_user_approval(
     """
     # Check for auto-approve flag (--yes mode)
     import os
+
     if os.environ.get("CHBUILD_AUTO_APPROVE") == "true":
         logger.info(f"Auto-approving change to {file_path} (--yes flag enabled)")
         return "y"
@@ -353,9 +348,6 @@ def _get_user_approval(
         # Try to use InteractiveCLI widget for TUI mode
         try:
             # Use a simple synchronous approach with threading
-            import threading
-            import time
-
             response_container = {"response": None, "received": False}
 
             def input_callback(user_input: str):
@@ -486,8 +478,7 @@ Do you want to proceed with this file write? (y/n/all)"""
         # Check if user approved
         if user_response and user_response.lower() in ["y", "yes"]:
             # User approved - write the file using Strands file_write tool
-
-            result = agent.tool.file_write(path=path, content=content)
+            agent.tool.file_write(path=path, content=content)
             logger.info(f"✅ File write approved and completed: {path}")
             return f"✅ Successfully wrote to {path} (approved by user)"
         else:

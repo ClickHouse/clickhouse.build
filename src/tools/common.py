@@ -29,45 +29,45 @@ _skip_confirmations = False
 # Allowlist of safe command prefixes that can be executed
 # These are common development tools that are generally safe
 ALLOWED_COMMANDS = {
-    'npm',
-    'yarn',
-    'pnpm',
-    'node',
-    'python',
-    'python3',
-    'pip',
-    'pip3',
-    'git',
-    'ls',
-    'cat',
-    'grep',
-    'find',
-    'mkdir',
-    'touch',
-    'echo',
-    'pwd',
-    'which',
-    'whoami',
-    'env',
-    'printenv',
-    'test',
-    'tsc',
-    'npx',
+    "npm",
+    "yarn",
+    "pnpm",
+    "node",
+    "python",
+    "python3",
+    "pip",
+    "pip3",
+    "git",
+    "ls",
+    "cat",
+    "grep",
+    "find",
+    "mkdir",
+    "touch",
+    "echo",
+    "pwd",
+    "which",
+    "whoami",
+    "env",
+    "printenv",
+    "test",
+    "tsc",
+    "npx",
 }
 
 # Patterns that indicate dangerous commands
 DANGEROUS_PATTERNS = [
-    r'\brm\s+-rf\s+/',           # Dangerous rm commands targeting root
-    r'\brm\s+-rf\s+\*',          # Dangerous rm commands with wildcards
-    r'\b(sudo|su)\b',            # Privilege escalation
-    r'[>;|]\s*/dev/',            # Device manipulation
-    r':\(\)\{.*\};',             # Fork bombs
-    r'curl.*\|.*(bash|sh)',      # Piping to shell from curl
-    r'wget.*\|.*(bash|sh)',      # Piping to shell from wget
-    r'\bchmod\s+777',            # Overly permissive chmod
-    r'\bchown\s+-R\s+.*\s+/',    # Dangerous recursive chown on root
-    r'>\s*/dev/sd[a-z]',         # Writing to disk devices
-    r'dd\s+if=.*of=/dev/',       # Dangerous dd operations
+    r"\brm\s+-rf\s+/",  # Dangerous rm commands targeting root
+    r"\brm\s+-rf\s+\*",  # Dangerous rm commands with wildcards
+    r"\b(sudo|su)\b",  # Privilege escalation
+    r"[>;|]\s*/dev/",  # Device manipulation
+    r":\(\)\{.*\};",  # Fork bombs
+    r"curl.*\|.*(bash|sh)",  # Piping to shell from curl
+    r"wget.*\|.*(bash|sh)",  # Piping to shell from wget
+    r"\bchmod\s+777",  # Overly permissive chmod
+    r"\bchown\s+-R\s+.*\s+/",  # Dangerous recursive chown on root
+    r">\s*/dev/sd[a-z]",  # Writing to disk devices
+    r"dd\s+if=.*of=/dev/",  # Dangerous dd operations
 ]
 
 
@@ -114,7 +114,7 @@ def _requires_shell_features(command: str) -> bool:
     Returns:
         True if shell features are required
     """
-    shell_features = ['|', '>', '<', '&&', '||', ';', '$(', '`', '*', '?', '[', '{']
+    shell_features = ["|", ">", "<", "&&", "||", ";", "$(", "`", "*", "?", "[", "{"]
     return any(feature in command for feature in shell_features)
 
 
@@ -200,7 +200,9 @@ def _execute_command_safely(
             )
         except (ValueError, FileNotFoundError) as e:
             # If parsing fails, log and fall back to shell execution
-            logger.warning(f"Failed to execute without shell: {e}, falling back to shell=True")
+            logger.warning(
+                f"Failed to execute without shell: {e}, falling back to shell=True"
+            )
 
     # Fall back to shell execution (for pipes, redirects, etc.)
     logger.debug(f"Executing with shell: {command}")
@@ -344,9 +346,8 @@ def write(file_path: str, content: str) -> str:
 
     from rich.console import Console
     from rich.panel import Panel
-    from rich.prompt import Confirm, Prompt
+    from rich.prompt import Prompt
     from rich.syntax import Syntax
-    from rich.text import Text
 
     console = Console()
 
@@ -497,6 +498,7 @@ def write(file_path: str, content: str) -> str:
 
         # Ask for approval (unless user selected "all" previously or --yes flag is set)
         import os
+
         if os.environ.get("CHBUILD_AUTO_APPROVE") == "true":
             approved = True
             console.print("[dim]Auto-approved (--yes flag enabled)[/dim]")
@@ -579,8 +581,7 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
     from rich.console import Console
     from rich.panel import Panel
-    from rich.prompt import Confirm, Prompt
-    from rich.syntax import Syntax
+    from rich.prompt import Prompt
 
     console = Console()
 
@@ -616,7 +617,9 @@ def bash_run(command: str, working_dir: str = ".") -> str:
         # Security check 2: Check if command is in allowlist
         is_allowed, allow_reason = _is_command_allowed(command)
         if not is_allowed:
-            logger.warning(f"Blocked non-allowlisted command: {command} - {allow_reason}")
+            logger.warning(
+                f"Blocked non-allowlisted command: {command} - {allow_reason}"
+            )
             return json.dumps(
                 {
                     "error": f"Command not allowed: {allow_reason}",
@@ -651,6 +654,7 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
         # Ask for approval (unless user selected "all" previously or --yes flag is set)
         import os
+
         if os.environ.get("CHBUILD_AUTO_APPROVE") == "true":
             approved = True
             console.print("[dim]Auto-approved (--yes flag enabled)[/dim]")
@@ -697,7 +701,7 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
         # Show result
         if result.returncode == 0:
-            console.print(f"[green]✓ Command completed successfully[/green]")
+            console.print("[green]✓ Command completed successfully[/green]")
         else:
             console.print(
                 f"[yellow]⚠ Command exited with code {result.returncode}[/yellow]"
@@ -718,7 +722,7 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
     except subprocess.TimeoutExpired:
         logger.error(f"Command timed out: {command}")
-        console.print(f"[red]✗ Command timed out after 5 minutes[/red]")
+        console.print("[red]✗ Command timed out after 5 minutes[/red]")
         return json.dumps(
             {
                 "error": "Command timed out after 5 minutes",

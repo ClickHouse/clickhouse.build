@@ -10,8 +10,16 @@ from strands.models import BedrockModel
 
 from ..agents.qa_code_migrator import qa_approve
 from ..prompts.code_migrator import get_system_prompt
-from ..tools.common import (bash_run, call_human, glob, grep, load_example,
-                            read, reset_confirmations, write)
+from ..tools.common import (
+    bash_run,
+    call_human,
+    glob,
+    grep,
+    load_example,
+    read,
+    reset_confirmations,
+    write,
+)
 from ..tui import print_error, print_header, print_info, print_summary_panel
 from ..utils import check_aws_credentials, get_callback_handler
 from ..utils.langfuse import get_langfuse_client
