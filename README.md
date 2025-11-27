@@ -1,6 +1,7 @@
 # ClickHouse Build (ProtoType)
 
 Agentic PostgreSQL to ClickHouse migration tool for TypeScript projects.
+
 This prototype was co-developed between AWS and ClickHouse.
 
 <img src="./.github/static/chbuild.png" alt="clickhouse.build cli tool">
@@ -11,8 +12,7 @@ This prototype was co-developed between AWS and ClickHouse.
 
 1. **Scans** your codebase to discover PostgreSQL analytical queries (aggregations, GROUP BY, window functions, etc.)
 2. **Generates** ClickPipe configuration for CDC or snapshot-based data replication
-3. **Migrates** application code by installing ClickHouse client libraries and implementing strategy patterns for query routing
-4. **Supports** multiple ORMs: Prisma, Drizzle, and raw SQL
+3. **Migrates** application code by installing ClickHouse client and implementing patterns for query routing
 
 The tool uses specialized AI agents that understand your code structure, database schema, and ORM patterns to generate production-ready migration code.
 
@@ -24,8 +24,6 @@ Before using `clickhouse.build`, ensure you have:
 - **uv** package manager ([installation guide](https://github.com/astral-sh/uv))
 - **AWS credentials** with access to Amazon Bedrock
 - **Claude Sonnet 4.5** enabled in your AWS Bedrock account
-- A **Git repository** with PostgreSQL-based application code
-- **Working branch** for migration changes
 
 ## Installation
 
@@ -60,11 +58,7 @@ Before running the migration:
 
 1. **Work on a branch** - Never run migrations directly on main
 2. **Create AGENTS.md** - Add an [AGENTS.md](https://agents.md/) file to your repository to help `chbuild` improve its efficacy when understanding your codebase
-
-### AGENTS.md Example
-
-Create an `AGENTS.md` file in your repository root to provide context about your application.
-For more information see: https://agents.md/
+3. Consider running `clickhouse.build` in a VM or container for additional safety precautions
 
 ## Running
 
@@ -133,4 +127,5 @@ uv run main.py migrate [REPO_PATH] [--replication-mode cdc|snapshot|cdc_only]
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
 We welcome feedback on the direction of this project as we continue to evolve it.
