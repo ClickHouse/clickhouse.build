@@ -39,11 +39,24 @@ class EvalMetrics:
 
 def extract_config_from_curl(curl_command: str) -> Dict:
     """Extract the JSON config from the curl command"""
-    # Find the --data argument and extract the JSON
+    # Try to find JSON in heredoc format (new format: --data @- with <<'EOF')
+    match = re.search(r"--data @-\n({.*?})\nEOF", curl_command, re.DOTALL)
+    if match:
+        json_str = match.group(1)
+        # Replace bash variable placeholders with valid JSON values for parsing
+        # These are meant for envsubst but we need to parse the template
+        # Handle unquoted numeric port variable
+        json_str = re.sub(r'\$\{POSTGRES_PORT\}', '5432', json_str)
+        # Handle quoted string variables - replace the whole "${VAR}" including quotes
+        json_str = re.sub(r'"\$\{[A-Z_]+\}"', '"<PLACEHOLDER>"', json_str)
+        return json.loads(json_str)
+
+    # Fall back to old format: --data '{...}'
     match = re.search(r"--data\s+'({.*})'", curl_command, re.DOTALL)
     if match:
         json_str = match.group(1)
         return json.loads(json_str)
+
     raise ValueError("Could not extract config from curl command")
 
 
