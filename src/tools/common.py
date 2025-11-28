@@ -62,6 +62,12 @@ DANGEROUS_PATTERNS = [
     r"\bchown\s+-R\s+.*\s+/",  # Dangerous recursive chown on root
     r">\s*/dev/sd[a-z]",  # Writing to disk devices
     r"dd\s+if=.*of=/dev/",  # Dangerous dd operations
+    r"\|\s*bash\s*$",  # Piping to bash at end of command
+    r"\|\s*sh\s*$",  # Piping to sh at end of command
+    r";\s*rm\b",  # Command chaining with rm
+    r"&&\s*rm\b",  # Command chaining with rm
+    r"\$\([^)]*rm\b",  # Command substitution containing rm
+    r"`[^`]*rm\b",  # Backtick substitution containing rm
 ]
 
 
