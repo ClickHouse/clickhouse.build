@@ -12,7 +12,7 @@ from strands.models import BedrockModel
 
 from ..logging_config import get_current_log_file
 from ..prompts.scanner import get_system_prompt
-from ..tools.common import glob, grep, read
+from ..tools.common import glob, grep, read, set_project_root
 from ..tui import (
     print_code,
     print_error,
@@ -56,6 +56,7 @@ class QueryAnalysisResult(BaseModel):
 @observe(name="agent_scanner")
 def agent_scanner(repo_path: str) -> str:
     logger.info(f"scanner starting analysis of repository: {repo_path}")
+    set_project_root(repo_path)
 
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
