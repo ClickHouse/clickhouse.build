@@ -18,6 +18,7 @@ from ..tools.common import (
     load_example,
     read,
     reset_confirmations,
+    set_project_root,
     write,
 )
 from ..tui import print_error, print_header, print_info, print_summary_panel
@@ -42,6 +43,7 @@ def agent_code_migrator(repo_path: str) -> str:
         Migration guidance (currently just a hello world message)
     """
     logger.info(f"Code migrator agent starting analysis of repository: {repo_path}")
+    set_project_root(repo_path)
 
     # Reset confirmation state for this agent run
     reset_confirmations()

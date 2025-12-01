@@ -26,18 +26,17 @@ EXCLUDED_DIRS = {
 # Global state to track if user selected "all" for confirmations
 _skip_confirmations = False
 
+# Global state to track the allowed project directory
+_project_root: Path | None = None
+
 # Allowlist of safe command prefixes that can be executed
 # These are common development tools that are generally safe
 ALLOWED_COMMANDS = {
     "npm",
     "yarn",
+    "bun",
     "pnpm",
     "node",
-    "python",
-    "python3",
-    "pip",
-    "pip3",
-    "git",
     "ls",
     "cat",
     "grep",
@@ -48,8 +47,6 @@ ALLOWED_COMMANDS = {
     "pwd",
     "which",
     "whoami",
-    "env",
-    "printenv",
     "test",
     "tsc",
     "npx",
@@ -68,6 +65,12 @@ DANGEROUS_PATTERNS = [
     r"\bchown\s+-R\s+.*\s+/",  # Dangerous recursive chown on root
     r">\s*/dev/sd[a-z]",  # Writing to disk devices
     r"dd\s+if=.*of=/dev/",  # Dangerous dd operations
+    r"\|\s*bash\s*$",  # Piping to bash at end of command
+    r"\|\s*sh\s*$",  # Piping to sh at end of command
+    r";\s*rm\b",  # Command chaining with rm
+    r"&&\s*rm\b",  # Command chaining with rm
+    r"\$\([^)]*rm\b",  # Command substitution containing rm
+    r"`[^`]*rm\b",  # Backtick substitution containing rm
 ]
 
 
@@ -86,6 +89,53 @@ def set_skip_confirmations():
     """Set the flag to skip future confirmations."""
     global _skip_confirmations
     _skip_confirmations = True
+
+
+def set_project_root(project_path: str | Path):
+    """
+    Set the project root directory for file access restrictions.
+
+    Args:
+        project_path: The root directory path for the project
+    """
+    global _project_root
+    _project_root = Path(project_path).resolve()
+    logger.info(f"Project root set to: {_project_root}")
+
+
+def get_project_root() -> Path | None:
+    """Get the current project root directory."""
+    return _project_root
+
+
+def _validate_path_in_project(path: Path) -> tuple[bool, str | None]:
+    """
+    Validate that a path is within the project directory.
+
+    Args:
+        path: The path to validate
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if _project_root is None:
+        return False, "Project root not set. Cannot validate file access."
+
+    try:
+        # Resolve the path to handle symlinks and relative paths
+        resolved_path = path.resolve()
+
+        # Check if the resolved path is within the project root
+        try:
+            resolved_path.relative_to(_project_root)
+            return True, None
+        except ValueError:
+            return (
+                False,
+                f"Access denied: Path is outside project directory. Path: {resolved_path}, Project root: {_project_root}",
+            )
+    except Exception as e:
+        return False, f"Error validating path: {e}"
 
 
 def _is_dangerous_command(command: str) -> tuple[bool, str | None]:
@@ -233,6 +283,12 @@ def glob(pattern: str, path: str = ".") -> str:
     try:
         search_path = Path(path).resolve()
 
+        # Validate path is within project directory
+        is_valid, error_msg = _validate_path_in_project(search_path)
+        if not is_valid:
+            logger.warning(f"Path validation failed for glob: {error_msg}")
+            return json.dumps({"error": error_msg, "files": []})
+
         if not search_path.exists():
             return json.dumps({"error": f"Path does not exist: {path}", "files": []})
 
@@ -286,6 +342,12 @@ def read(file_path: str, offset: int = 0, limit: int = None) -> str:
     """
     try:
         path = Path(file_path).resolve()
+
+        # Validate path is within project directory
+        is_valid, error_msg = _validate_path_in_project(path)
+        if not is_valid:
+            logger.warning(f"Path validation failed for read: {error_msg}")
+            return json.dumps({"error": error_msg, "content": ""})
 
         if not path.exists():
             return json.dumps(
@@ -353,6 +415,14 @@ def write(file_path: str, content: str) -> str:
 
     try:
         path = Path(file_path).resolve()
+
+        # Validate path is within project directory
+        is_valid, error_msg = _validate_path_in_project(path)
+        if not is_valid:
+            logger.warning(f"Path validation failed for write: {error_msg}")
+            console.print(f"[red]✗ Access denied: {error_msg}[/red]")
+            return json.dumps({"error": error_msg, "success": False})
+
         file_exists = path.exists()
 
         # Force a newline to break out of any active callback displays
@@ -588,6 +658,22 @@ def bash_run(command: str, working_dir: str = ".") -> str:
     try:
         work_path = Path(working_dir).resolve()
 
+        # Validate working directory is within project directory
+        is_valid, error_msg = _validate_path_in_project(work_path)
+        if not is_valid:
+            logger.warning(f"Path validation failed for bash_run: {error_msg}")
+            return json.dumps(
+                {
+                    "error": error_msg,
+                    "command": command,
+                    "exit_code": 1,
+                    "stdout": "",
+                    "stderr": "",
+                    "blocked": True,
+                },
+                indent=2,
+            )
+
         if not work_path.exists():
             return json.dumps(
                 {
@@ -652,30 +738,24 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
         console.print()
 
-        # Ask for approval (unless user selected "all" previously or --yes flag is set)
+        # Ask for approval
+        # NOTE: --yes flag (CI mode) auto-approves everything
+        # But user selecting "all" for file writes should NOT auto-approve bash commands
         import os
 
         if os.environ.get("CHBUILD_AUTO_APPROVE") == "true":
+            # CI mode: auto-approve everything including bash commands
             approved = True
             console.print("[dim]Auto-approved (--yes flag enabled)[/dim]")
-        elif should_skip_confirmation():
-            approved = True
-            console.print("[dim]Auto-approved (user selected 'all')[/dim]")
         else:
+            # Interactive mode: always ask for bash command approval
+            # even if user selected "all" for file writes
             response = Prompt.ask(
-                "[bold cyan]Approve this command execution? (y/n/all)[/bold cyan]",
-                choices=["y", "n", "all"],
+                "[bold cyan]Approve this command execution? (y/n)[/bold cyan]",
+                choices=["y", "n"],
                 default="y",
             )
-
-            if response == "all":
-                set_skip_confirmations()
-                approved = True
-                console.print(
-                    "[green]All future operations will be auto-approved[/green]"
-                )
-            else:
-                approved = response == "y"
+            approved = response == "y"
 
         if not approved:
             console.print("[yellow]✗ Command execution cancelled by user[/yellow]")
@@ -871,6 +951,12 @@ def grep(
         import re
 
         search_path = Path(path).resolve()
+
+        # Validate path is within project directory
+        is_valid, error_msg = _validate_path_in_project(search_path)
+        if not is_valid:
+            logger.warning(f"Path validation failed for grep: {error_msg}")
+            return json.dumps({"error": error_msg, "results": []})
 
         if not search_path.exists():
             return json.dumps({"error": f"Path does not exist: {path}", "results": []})
