@@ -1,4 +1,4 @@
-# ClickHouse Build (ProtoType)
+# clickhouse.build
 
 Agentic PostgreSQL to ClickHouse migration tool for TypeScript projects.
 
