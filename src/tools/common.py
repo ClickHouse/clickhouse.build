@@ -738,30 +738,24 @@ def bash_run(command: str, working_dir: str = ".") -> str:
 
         console.print()
 
-        # Ask for approval (unless user selected "all" previously or --yes flag is set)
+        # Ask for approval
+        # NOTE: --yes flag (CI mode) auto-approves everything
+        # But user selecting "all" for file writes should NOT auto-approve bash commands
         import os
 
         if os.environ.get("CHBUILD_AUTO_APPROVE") == "true":
+            # CI mode: auto-approve everything including bash commands
             approved = True
             console.print("[dim]Auto-approved (--yes flag enabled)[/dim]")
-        elif should_skip_confirmation():
-            approved = True
-            console.print("[dim]Auto-approved (user selected 'all')[/dim]")
         else:
+            # Interactive mode: always ask for bash command approval
+            # even if user selected "all" for file writes
             response = Prompt.ask(
-                "[bold cyan]Approve this command execution? (y/n/all)[/bold cyan]",
-                choices=["y", "n", "all"],
+                "[bold cyan]Approve this command execution? (y/n)[/bold cyan]",
+                choices=["y", "n"],
                 default="y",
             )
-
-            if response == "all":
-                set_skip_confirmations()
-                approved = True
-                console.print(
-                    "[green]All future operations will be auto-approved[/green]"
-                )
-            else:
-                approved = response == "y"
+            approved = response == "y"
 
         if not approved:
             console.print("[yellow]✗ Command execution cancelled by user[/yellow]")
