@@ -10,7 +10,7 @@ This prototype was co-developed between AWS and ClickHouse.
 
 clickhouse.build is a free, client-side CLI. You can install the CLI from this repo and try it out with your project.
 
-If you don't already have a ClickHouse environment, you can [sign up for a free ClickHouse Cloud trial](https://console.clickhouse.cloud/signUp?utm_source=github&utm_medium=github&utm_referrer=clickhouse_build) with $300 in credits.
+If you don't already have a ClickHouse environment, you can [sign up for a free ClickHouse Cloud trial](https://console.clickhouse.cloud/signUp?utm_source=github&utm_medium=github&utm_referrer=clickhouse_build&ref=clickhouse_build) with $300 in credits.
 
 ## What Does It Do?
 
