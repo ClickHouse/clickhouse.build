@@ -58,3 +58,23 @@ jobs:
 
             ## What's Changed
             See the full changelog below.
+
+      - name: Send Slack notification
+        id: slack
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
+        with:
+          webhook: ${{ secrets.RELEASE_SLACK_WEBHOOK }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "clickhouse.build ${{ github.ref_name }} has been released.",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "clickhouse.build <https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}> has been released."
+                  }
+                }
+              ]
+            }
