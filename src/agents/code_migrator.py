@@ -9,6 +9,7 @@ from strands import Agent, tool
 from strands.models import BedrockModel
 
 from ..agents.qa_code_migrator import qa_approve
+from ..models_config import DEFAULT_MODEL, get_model_id
 from ..prompts.code_migrator import get_system_prompt
 from ..tools.common import (
     bash_run,
@@ -27,17 +28,16 @@ from ..utils.langfuse import get_langfuse_client
 
 logger = logging.getLogger(__name__)
 
-model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
-
 
 @tool
 @observe(name="agent_code_migrator")
-def agent_code_migrator(repo_path: str) -> str:
+def agent_code_migrator(repo_path: str, model: str = DEFAULT_MODEL) -> str:
     """
     Run the code migrator agent to help migrate application code.
 
     Args:
         repo_path: Path to the repository
+        model: AI model to use for analysis. Default is DEFAULT_MODEL.
 
     Returns:
         Migration guidance (currently just a hello world message)
@@ -53,6 +53,7 @@ def agent_code_migrator(repo_path: str) -> str:
         print_error(error_message)
         return f"Error: {error_message}"
 
+    model_id = get_model_id(model)
     bedrock_model = BedrockModel(
         model_id=model_id,
         max_tokens=16_000,

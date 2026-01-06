@@ -5,17 +5,21 @@ from langfuse import observe
 from strands import Agent, tool
 from strands.models import BedrockModel
 
+from ..models_config import DEFAULT_MODEL, get_model_id
 from ..prompts.qa_code_migrator import QA_SYSTEM_PROMPT
 from ..tui import print_error, print_info, print_success
 
 logger = logging.getLogger(__name__)
 
-model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
-
 
 @tool
 @observe(name="agent_qa_code_migrator")
-def qa_approve(file_path: str, code_content: str, purpose: str = "code review") -> str:
+def qa_approve(
+    file_path: str,
+    code_content: str,
+    purpose: str = "code review",
+    model: str = DEFAULT_MODEL,
+) -> str:
     """
     Validate code before writing to a file.
 
@@ -23,11 +27,13 @@ def qa_approve(file_path: str, code_content: str, purpose: str = "code review") 
         file_path: The path where the code will be written
         code_content: The code to validate
         purpose: Brief description of what this code does
+        model: AI model to use for analysis. Default is DEFAULT_MODEL.
 
     Returns:
         JSON string with {"approved": boolean, "reason": string}
     """
     try:
+        model_id = get_model_id(model)
         bedrock_model = BedrockModel(model_id=model_id)
 
         prompt = f"""

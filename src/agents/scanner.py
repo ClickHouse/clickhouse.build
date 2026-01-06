@@ -11,6 +11,7 @@ from strands import Agent, tool
 from strands.models import BedrockModel
 
 from ..logging_config import get_current_log_file
+from ..models_config import DEFAULT_MODEL, get_model_id
 from ..prompts.scanner import get_system_prompt
 from ..tools.common import glob, grep, read, set_project_root
 from ..tui import (
@@ -26,9 +27,6 @@ from ..utils import check_aws_credentials, get_callback_handler
 from ..utils.langfuse import get_langfuse_client
 
 logger = logging.getLogger(__name__)
-
-
-model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
 class AnalyticalQuery(BaseModel):
@@ -54,7 +52,7 @@ class QueryAnalysisResult(BaseModel):
 
 @tool
 @observe(name="agent_scanner")
-def agent_scanner(repo_path: str) -> str:
+def agent_scanner(repo_path: str, model: str = DEFAULT_MODEL) -> str:
     logger.info(f"scanner starting analysis of repository: {repo_path}")
     set_project_root(repo_path)
 
@@ -70,6 +68,7 @@ def agent_scanner(repo_path: str) -> str:
         }
         return json.dumps(error_result, indent=2)
 
+    model_id = get_model_id(model)
     bedrock_model = BedrockModel(model_id=model_id)
 
     try:

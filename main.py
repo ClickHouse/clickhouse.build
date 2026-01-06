@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 # Now import local modules (after sys.path modification)
 from src.logging_config import get_chbuild_logger  # noqa: E402
+from src.models_config import DEFAULT_MODEL, get_model_id  # noqa: E402
 from src.tui.logo import print_logo  # noqa: E402
 from src.utils import check_aws_credentials  # noqa: E402
 
@@ -72,12 +73,25 @@ def main(ctx):
     is_flag=True,
     help="Skip AWS credentials validation",
 )
-def scanner(repo_path: str, skip_credentials_check: bool):
+@click.option(
+    "--model",
+    type=str,
+    default=DEFAULT_MODEL,
+    help="AI model to use for analysis (e.g., claude-opus-4-5, claude-sonnet-4-5)",
+)
+def scanner(repo_path: str, skip_credentials_check: bool, model: str):
     """
     Run the scanner agent to analyze a repository and find PostgreSQL analytical queries.
 
     REPO_PATH: Path to the repository to analyze
     """
+    # Validate model
+    try:
+        get_model_id(model)
+    except ValueError as e:
+        click.secho(f"Error: {e}", fg="red", err=True)
+        sys.exit(1)
+
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
         creds_available, error_message = check_aws_credentials()
@@ -122,12 +136,25 @@ def scanner(repo_path: str, skip_credentials_check: bool):
     is_flag=True,
     help="Skip all confirmation prompts and approve all changes automatically",
 )
-def code_migrator(repo_path: str, skip_credentials_check: bool, yes: bool):
+@click.option(
+    "--model",
+    type=str,
+    default=DEFAULT_MODEL,
+    help="AI model to use for analysis (e.g., claude-opus-4-5, claude-sonnet-4-5)",
+)
+def code_migrator(repo_path: str, skip_credentials_check: bool, yes: bool, model: str):
     """
     Run the code migrator agent to help migrate application code.
 
     REPO_PATH: Path to the repository to analyze
     """
+    # Validate model
+    try:
+        get_model_id(model)
+    except ValueError as e:
+        click.secho(f"Error: {e}", fg="red", err=True)
+        sys.exit(1)
+
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
         creds_available, error_message = check_aws_credentials()
@@ -151,7 +178,7 @@ def code_migrator(repo_path: str, skip_credentials_check: bool, yes: bool):
     try:
         from src.agents.code_migrator import agent_code_migrator
 
-        agent_code_migrator(repo_path)
+        agent_code_migrator(repo_path, model=model)
         click.secho("\n✓ Code migrator completed successfully", fg="green")
     except Exception as e:
         logger.error(f"Error running code migrator: {e}")
@@ -176,12 +203,27 @@ def code_migrator(repo_path: str, skip_credentials_check: bool, yes: bool):
     is_flag=True,
     help="Skip AWS credentials validation",
 )
-def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check: bool):
+@click.option(
+    "--model",
+    type=str,
+    default=DEFAULT_MODEL,
+    help="AI model to use for analysis (e.g., claude-opus-4-5, claude-sonnet-4-5)",
+)
+def data_migrator(
+    repo_path: str, replication_mode: str, skip_credentials_check: bool, model: str
+):
     """
     Run the data migrator agent to analyze the plan and generate ClickPipe configuration.
 
     REPO_PATH: Path to the repository to analyze
     """
+    # Validate model
+    try:
+        get_model_id(model)
+    except ValueError as e:
+        click.secho(f"Error: {e}", fg="red", err=True)
+        sys.exit(1)
+
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
         creds_available, error_message = check_aws_credentials()
@@ -201,7 +243,9 @@ def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check:
     try:
         from src.agents.data_migrator import run_data_migrator_agent
 
-        run_data_migrator_agent(repo_path, replication_mode=replication_mode)
+        run_data_migrator_agent(
+            repo_path, replication_mode=replication_mode, model=model
+        )
         click.secho("\n✓ Data migrator completed successfully", fg="green")
     except Exception as e:
         logger.error(f"Error running data migrator: {e}")
@@ -232,14 +276,31 @@ def data_migrator(repo_path: str, replication_mode: str, skip_credentials_check:
     is_flag=True,
     help="Skip all confirmation prompts and approve all changes automatically",
 )
+@click.option(
+    "--model",
+    type=str,
+    default=DEFAULT_MODEL,
+    help="AI model to use for analysis (e.g., claude-opus-4-5, claude-sonnet-4-5)",
+)
 def migrate(
-    repo_path: str, replication_mode: str, skip_credentials_check: bool, yes: bool
+    repo_path: str,
+    replication_mode: str,
+    skip_credentials_check: bool,
+    yes: bool,
+    model: str,
 ):
     """
     Run the complete migration workflow: [cyan]scanner[/cyan] [magenta]->[/magenta] [cyan]data_migrator[/cyan] [magenta]->[/magenta] [cyan]code_migrator[/cyan].
 
     REPO_PATH: Path to the repository to analyze
     """
+    # Validate model
+    try:
+        get_model_id(model)
+    except ValueError as e:
+        click.secho(f"Error: {e}", fg="red", err=True)
+        sys.exit(1)
+
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
         creds_available, error_message = check_aws_credentials()
@@ -275,7 +336,7 @@ def migrate(
         if response == "y":
             from src.agents.scanner import agent_scanner
 
-            agent_scanner(repo_path)
+            agent_scanner(repo_path, model=model)
             click.secho("✓ Scanner completed", fg="green")
         else:
             click.secho("Skipping scanner agent", fg="yellow")
@@ -298,7 +359,9 @@ def migrate(
         if response == "y":
             from src.agents.data_migrator import run_data_migrator_agent
 
-            run_data_migrator_agent(repo_path, replication_mode=replication_mode)
+            run_data_migrator_agent(
+                repo_path, replication_mode=replication_mode, model=model
+            )
             click.secho("✓ Data migrator completed", fg="green")
         else:
             click.secho("Skipping data migrator agent", fg="yellow")
@@ -317,7 +380,7 @@ def migrate(
         if response == "y":
             from src.agents.code_migrator import agent_code_migrator
 
-            agent_code_migrator(repo_path)
+            agent_code_migrator(repo_path, model=model)
             click.secho("✓ Code migrator completed", fg="green")
         else:
             click.secho("Skipping code migrator agent", fg="yellow")
