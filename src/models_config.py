@@ -56,6 +56,4 @@ def get_model_id(model_name: str) -> str:
 
     # If no match found, raise error
     available = ", ".join(AVAILABLE_MODELS)
-    raise ValueError(
-        f"Unknown model: {model_name}. Available models: {available}"
-    )
+    raise ValueError(f"Unknown model: {model_name}. Available models: {available}")
