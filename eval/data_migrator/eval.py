@@ -16,6 +16,7 @@ from typing import Any, Dict, List
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.agents.data_migrator import run_data_migrator_agent
+from src.models_config import DEFAULT_MODEL, get_model_id
 from src.utils import check_aws_credentials
 
 # Configure logging
@@ -123,7 +124,7 @@ def compare_configs(expected: Dict, actual: Dict) -> EvalMetrics:
 
 
 def run_single_eval(
-    test_case: Dict, base_path: str, fixtures_dir: Path
+    test_case: Dict, base_path: str, fixtures_dir: Path, model: str = DEFAULT_MODEL
 ) -> Dict[str, Any]:
     """Run evaluation for a single test case"""
     name = test_case["name"]
@@ -160,7 +161,7 @@ def run_single_eval(
             json.dump(scan_data, f, indent=2)
 
         # Run data migrator (it will read the fixture we just placed)
-        result_str = run_data_migrator_agent(repo_path, replication_mode)
+        result_str = run_data_migrator_agent(repo_path, replication_mode, model=model)
         result = json.loads(result_str)
 
         # Result should have "assumptions" and "config" keys
@@ -186,6 +187,7 @@ def run_single_eval(
 
     result = {
         "name": name,
+        "model_id": get_model_id(model),
         "status": "PASS" if passed else "FAIL",
         "metrics": {
             "database_correct": metrics.database_correct,
@@ -230,11 +232,12 @@ def run_single_eval(
     return result
 
 
-def main():
+def main(model: str = DEFAULT_MODEL):
     """Main evaluation function"""
     print("=" * 60)
     print("DATA MIGRATOR EVALUATION")
     print("=" * 60)
+    print(f"Using model: {model}\n")
 
     # Check AWS credentials
     print("\nChecking AWS credentials...")
@@ -257,7 +260,7 @@ def main():
     # Run evaluations
     results = []
     for test_case in ground_truth["test_cases"]:
-        result = run_single_eval(test_case, str(base_path), fixtures_dir)
+        result = run_single_eval(test_case, str(base_path), fixtures_dir, model=model)
         results.append(result)
 
     # Calculate overall metrics
@@ -311,6 +314,7 @@ def main():
         json.dump(
             {
                 "summary": {
+                    "model_id": get_model_id(model),
                     "total_tests": total_tests,
                     "passed": passed,
                     "failed": failed,
@@ -335,4 +339,15 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run data migrator evaluation")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL,
+        help="AI model to use for analysis (e.g., claude-opus-4-5, claude-sonnet-4-5)",
+    )
+    args = parser.parse_args()
+
+    main(model=args.model)

@@ -112,7 +112,7 @@ def scanner(repo_path: str, skip_credentials_check: bool, model: str):
     try:
         from src.agents.scanner import agent_scanner
 
-        agent_scanner(repo_path)
+        agent_scanner(repo_path, model=model)
         click.secho("\n✓ Scanner completed successfully", fg="green")
     except Exception as e:
         logger.error(f"Error running scanner: {e}")
@@ -408,12 +408,26 @@ def migrate(
     ),
     required=True,
 )
-def eval(agent: str):
+@click.option(
+    "--model",
+    type=str,
+    default=DEFAULT_MODEL,
+    help="AI model to use for analysis (e.g., claude-opus-4-5, claude-sonnet-4-5)",
+)
+def eval(agent: str, model: str):
     """
     Run evaluations for the specified agent.
 
     AGENT: The agent to evaluate (scanner, data-migrator, or qa-code-migrator)
     """
+    # Validate model
+    try:
+        get_model_id(model)
+    except ValueError as e:
+        click.secho(f"Error: {e}", fg="red", err=True)
+        sys.exit(1)
+    click.secho(f"✓ Using model {model}\n", fg="green")
+
     click.secho(f"\nRunning {agent} evaluation...\n", fg="cyan", bold=True)
 
     eval_dir = Path(__file__).parent / "eval" / agent.replace("-", "_")
@@ -430,7 +444,7 @@ def eval(agent: str):
         import subprocess
 
         result = subprocess.run(
-            [sys.executable, str(eval_script)],
+            [sys.executable, str(eval_script), "--model", model],
             cwd=str(eval_dir),
             capture_output=False,
         )
