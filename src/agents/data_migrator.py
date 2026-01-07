@@ -9,6 +9,7 @@ from strands import Agent
 from strands.models import BedrockModel
 
 from ..logging_config import get_current_log_file
+from ..models_config import DEFAULT_MODEL, get_model_id
 from ..prompts.data_migrator import get_system_prompt
 from ..tools.common import set_project_root
 from ..tools.data_migrator import create_clickpipe
@@ -18,8 +19,6 @@ from ..utils.langfuse import get_langfuse_client
 from .scanner import agent_scanner
 
 logger = logging.getLogger(__name__)
-
-model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
 def get_latest_scan(repo_path: str) -> tuple[dict, Path]:
@@ -60,7 +59,9 @@ def get_latest_scan(repo_path: str) -> tuple[dict, Path]:
 
 
 @observe(name="agent_data_migrator")
-def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> str:
+def run_data_migrator_agent(
+    repo_path: str, replication_mode: str = "cdc", model: str = DEFAULT_MODEL
+) -> str:
     """
     Run the data migrator agent to analyze the scan and generate ClickPipe config.
 
@@ -70,6 +71,7 @@ def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> st
             - cdc: Change Data Capture with initial snapshot + real-time sync
             - snapshot: One-time snapshot replication only
             - cdc_only: CDC without initial snapshot
+        model: AI model to use for analysis. Default is DEFAULT_MODEL.
 
     Returns:
         Result from the data migrator tool (ClickPipe configuration)
@@ -110,6 +112,7 @@ def run_data_migrator_agent(repo_path: str, replication_mode: str = "cdc") -> st
 
         print_info("Analyzing scan and generating configuration...", label="Step 2")
 
+        model_id = get_model_id(model)
         bedrock_model = BedrockModel(model_id=model_id)
 
         agent = Agent(
