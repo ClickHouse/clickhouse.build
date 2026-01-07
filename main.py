@@ -91,6 +91,7 @@ def scanner(repo_path: str, skip_credentials_check: bool, model: str):
     except ValueError as e:
         click.secho(f"Error: {e}", fg="red", err=True)
         sys.exit(1)
+    click.secho(f"✓ Using model {model}\n", fg="green")
 
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
@@ -154,6 +155,7 @@ def code_migrator(repo_path: str, skip_credentials_check: bool, yes: bool, model
     except ValueError as e:
         click.secho(f"Error: {e}", fg="red", err=True)
         sys.exit(1)
+    click.secho(f"✓ Using model {model}\n", fg="green")
 
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
@@ -223,6 +225,7 @@ def data_migrator(
     except ValueError as e:
         click.secho(f"Error: {e}", fg="red", err=True)
         sys.exit(1)
+    click.secho(f"✓ Using model {model}\n", fg="green")
 
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
@@ -300,6 +303,7 @@ def migrate(
     except ValueError as e:
         click.secho(f"Error: {e}", fg="red", err=True)
         sys.exit(1)
+    click.secho(f"✓ Using model {model}\n", fg="green")
 
     if not skip_credentials_check:
         logger.info("Checking AWS credentials...")
