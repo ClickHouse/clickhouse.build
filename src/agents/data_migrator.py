@@ -94,7 +94,7 @@ def run_data_migrator_agent(
         except FileNotFoundError:
             logger.info("No existing scan found, running scanner agent first...")
             print_info("No existing scan found, running scanner first", label="Notice")
-            agent_scanner(repo_path)
+            agent_scanner(repo_path, model=model)
             # Now get the scan that was just created
             scan_data, scan_file_path = get_latest_scan(repo_path)
 

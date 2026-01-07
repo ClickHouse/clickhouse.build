@@ -15,6 +15,7 @@ from typing import Any, Dict
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.agents.scanner import agent_scanner
+from src.models_config import DEFAULT_MODEL, get_model_id
 from src.utils import check_aws_credentials
 
 # Configure logging
@@ -164,7 +165,7 @@ def calculate_metrics(expected: Dict, actual: Dict) -> EvalMetrics:
     )
 
 
-def run_single_eval(test_case: Dict, base_path: str) -> Dict[str, Any]:
+def run_single_eval(test_case: Dict, base_path: str, model: str = DEFAULT_MODEL) -> Dict[str, Any]:
     """Run evaluation for a single test case"""
     name = test_case["name"]
     repo_path = os.path.join(base_path, test_case["repo_path"])
@@ -184,7 +185,7 @@ def run_single_eval(test_case: Dict, base_path: str) -> Dict[str, Any]:
         }
 
     try:
-        result_json = agent_scanner(repo_path)
+        result_json = agent_scanner(repo_path, model=model)
         actual = json.loads(result_json)
     except Exception as e:
         return {"name": name, "status": "ERROR", "error": str(e)}
@@ -206,6 +207,7 @@ def run_single_eval(test_case: Dict, base_path: str) -> Dict[str, Any]:
 
     result = {
         "name": name,
+        "model_id": get_model_id(model),
         "status": "PASS" if passed else "FAIL",
         "metrics": {
             "precision": round(metrics.precision, 3),
@@ -267,14 +269,15 @@ def run_single_eval(test_case: Dict, base_path: str) -> Dict[str, Any]:
     return result
 
 
-def main():
+def main(model: str = DEFAULT_MODEL):
     """Main evaluation function"""
     print("=" * 60)
     print("CODE SCANNER EVALUATION")
     print("=" * 60)
+    print(f"Using model: {model}\n")
 
     # Check AWS credentials
-    print("\nChecking AWS credentials...")
+    print("Checking AWS credentials...")
     creds_available, error_message = check_aws_credentials()
     if not creds_available:
         print(f"Error: {error_message}")
@@ -293,7 +296,7 @@ def main():
     # Run evaluations
     results = []
     for test_case in ground_truth["test_cases"]:
-        result = run_single_eval(test_case, str(base_path))
+        result = run_single_eval(test_case, str(base_path), model=model)
         results.append(result)
 
     # Calculate overall metrics
@@ -337,6 +340,7 @@ def main():
         json.dump(
             {
                 "summary": {
+                    "model_id": get_model_id(model),
                     "total_tests": total_tests,
                     "passed": passed,
                     "failed": failed,
@@ -361,4 +365,15 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run scanner evaluation")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL,
+        help="AI model to use for analysis (e.g., claude-opus-4-5, claude-sonnet-4-5)",
+    )
+    args = parser.parse_args()
+
+    main(model=args.model)
